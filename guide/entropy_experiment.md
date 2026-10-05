@@ -143,6 +143,18 @@ before/after 的 class-wise 指标也会保留。
 outputs/png/entropy/*.png
 outputs/pdf/entropy/*.pdf
 
+Entropy 图片按用途分类保存：
+
+```text
+outputs/png/entropy/epoch_metrics/   # entropy、confidence、accuracy、loss、ECE
+outputs/png/entropy/relationships/   # entropy-confidence-accuracy 及变化量/变化率
+outputs/png/entropy/classwise/       # 单 class、class group 和指定 epoch 柱状图
+outputs/png/entropy/reliability/     # reliability summary
+outputs/png/entropy/batch/           # batch entropy/loss 和 transfer effect
+```
+
+`outputs/pdf/entropy/` 使用完全相同的子目录结构。
+
 原有 loss/accuracy/LR 图位于：
 
 ```text

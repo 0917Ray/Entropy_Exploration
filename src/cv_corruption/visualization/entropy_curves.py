@@ -25,8 +25,8 @@ def _load(run_dir: Path):
 
 
 def _save(fig, output: Path, dpi=300):
-    root = output.parents[1]
-    category = output.parent.name
+    root = output.parents[2]
+    category = f"{output.parent.parent.name}/{output.parent.name}"
     for extension in ("png", "pdf"):
         target = root / extension / category / f"{output.name}.{extension}"
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -256,11 +256,11 @@ def render_entropy_bundle(run_dir: Path, config_path: Path | None = None) -> Pat
             config = yaml.safe_load(stream) or {}
     output_dir = run_dir / "outputs/entropy"
     for key in METRICS:
-        _line_plot(rows, key, output_dir / f"epoch_{key}")
-    _triad(rows, output_dir / "epoch_entropy_confidence_accuracy")
-    _triad(rows, output_dir / "epoch_entropy_confidence_accuracy_delta", delta=True)
-    _triad(rows, output_dir / "epoch_entropy_confidence_accuracy_rate", rate=True)
-    _classwise(rows, output_dir, config)
-    _reliability(rows, output_dir)
-    _batch_plot(run_dir, output_dir)
+        _line_plot(rows, key, output_dir / "epoch_metrics" / f"epoch_{key}")
+    _triad(rows, output_dir / "relationships" / "epoch_entropy_confidence_accuracy")
+    _triad(rows, output_dir / "relationships" / "epoch_entropy_confidence_accuracy_delta", delta=True)
+    _triad(rows, output_dir / "relationships" / "epoch_entropy_confidence_accuracy_rate", rate=True)
+    _classwise(rows, output_dir / "classwise", config)
+    _reliability(rows, output_dir / "reliability")
+    _batch_plot(run_dir, output_dir / "batch")
     return output_dir
