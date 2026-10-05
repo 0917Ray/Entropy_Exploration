@@ -46,6 +46,9 @@ OMP_NUM_THREADS=1 torchrun --standalone --nproc_per_node=4 \
   --output-dir runs/cifar10_resnet50_4gpu_500epochs
 ```
 
+Entropy 实验的四卡完整教程（包括 GPU 检查、四卡 smoke test、seed 批量运行和断点恢复）见
+[Experiment 1：Entropy 监测](entropy_experiment.md#四张-gpu-运行)。
+
 ## 恢复训练
 
 ```bash

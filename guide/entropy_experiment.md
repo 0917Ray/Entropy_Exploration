@@ -46,6 +46,75 @@ cv-train \
 
 smoke 模式只处理少量 batch，适合验证代码和输出格式，不用于报告实验结果。
 
+## 四张 GPU 运行
+
+先确认四张卡均可见：
+
+```bash
+nvidia-smi --query-gpu=index,name,memory.total,memory.used --format=csv
+```
+
+四卡 DDP 使用 `torchrun` 启动四个进程；`--gpu-ids` 必须与
+`--nproc_per_node` 一一对应。下面命令运行 seed 0 的完整 200 epoch entropy 实验：
+
+```bash
+OMP_NUM_THREADS=1 torchrun --standalone --nproc_per_node=4 \
+  -m cv_corruption.cli.train \
+  --config configs/training/cifar10_resnet50.yaml \
+  --gpu-ids 0 1 2 3 \
+  --seed 0 \
+  --epochs 200 \
+  --batch-size 256 \
+  --ece-bins 10 \
+  --output-dir runs/entropy_seed0_4gpu
+```
+
+这里的 `batch-size` 是每张 GPU 的 batch size，全局 batch size 为
+`batch_size * 4`。学习率会按全局 batch size 相对于 128 自动缩放。不同随机种子必须使用
+不同的 `--output-dir`，例如：
+
+```bash
+for seed in 0 1 2 3 4; do
+  OMP_NUM_THREADS=1 torchrun --standalone --nproc_per_node=4 \
+    -m cv_corruption.cli.train \
+    --config configs/training/cifar10_resnet50.yaml \
+    --gpu-ids 0 1 2 3 --seed "$seed" --epochs 200 \
+    --output-dir "runs/entropy_seed${seed}_4gpu"
+done
+```
+
+四卡运行时 rank 0 负责写日志、checkpoint 和指标文件；训练和测试数据由 DDP sampler
+分片，epoch-level entropy 评估使用固定顺序的完整 loader。启动后应看到
+`rank=0/4`、`gpus=[0, 1, 2, 3]`，否则说明进程数或 GPU 参数不匹配。
+
+### 四卡 smoke test
+
+正式运行前可以用四卡做快速检查：
+
+```bash
+OMP_NUM_THREADS=1 torchrun --standalone --nproc_per_node=4 \
+  -m cv_corruption.cli.train \
+  --config configs/training/cifar10_resnet50.yaml \
+  --gpu-ids 0 1 2 3 --seed 0 --smoke \
+  --batch-size 2 --train-batches 1 --test-batches 1 --workers 0 \
+  --output-dir runs/entropy_smoke_4gpu
+```
+
+### 断点恢复
+
+四卡训练必须使用相同数量的 GPU、相同关键优化器参数和相同 AMP 设置恢复：
+
+```bash
+OMP_NUM_THREADS=1 torchrun --standalone --nproc_per_node=4 \
+  -m cv_corruption.cli.train \
+  --resume runs/entropy_seed0_4gpu_YYYYMMDD-HHMMSS/checkpoints/last.pt \
+  --gpu-ids 0 1 2 3 --epochs 220
+```
+
+常见错误：`world_size` 与 `--gpu-ids` 数量不一致时，请确认
+`--nproc_per_node=4 --gpu-ids 0 1 2 3`；显存不足时优先降低每卡 `--batch-size`，不要改变
+GPU 数量后直接恢复旧 checkpoint。
+
 ## 输出文件
 
 每个 run 目录包含：
