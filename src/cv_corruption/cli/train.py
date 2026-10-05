@@ -32,6 +32,7 @@ from cv_corruption.data.cifar10 import CIFAR10Pickles, class_names
 from cv_corruption.models.resnet import MEAN, STD, make_model
 from cv_corruption.config.loader import parse_config, save_config
 from cv_corruption.visualization.training_curves import write_bundle
+from cv_corruption.evaluation.metrics import batch_metrics, weighted_average
 
 
 SUCCESS_LEVEL = 25
@@ -120,10 +121,12 @@ def save_checkpoint(path: Path, checkpoint: dict):
     os.replace(tmp, path)
 
 
-def run_epoch(model, loader, criterion, device, max_batches, optimizer=None, scaler=None, amp=False):
+def run_epoch(model, loader, criterion, device, max_batches, optimizer=None, scaler=None, amp=False,
+              ece_bins=10, collect_batch_metrics=False):
     training = optimizer is not None
     model.train(training)
     totals = torch.zeros(3, dtype=torch.float64, device=device)
+    batch_records = []
     for batch_id, (inputs, targets) in enumerate(loader):
         if max_batches is not None and batch_id >= max_batches:
             break
@@ -132,6 +135,7 @@ def run_epoch(model, loader, criterion, device, max_batches, optimizer=None, sca
         with torch.set_grad_enabled(training), torch.autocast(device_type=device.type, enabled=amp):
             logits = model(inputs)
             loss = criterion(logits, targets)
+        before = batch_metrics(logits.detach().cpu(), targets.cpu(), ece_bins=ece_bins) if collect_batch_metrics else None
         if not torch.isfinite(loss):
             raise FloatingPointError(f"Non-finite loss at batch {batch_id}: {loss.item()}")
         if training:
@@ -143,6 +147,13 @@ def run_epoch(model, loader, criterion, device, max_batches, optimizer=None, sca
             else:
                 loss.backward()
                 optimizer.step()
+            if collect_batch_metrics:
+                with torch.inference_mode(), torch.autocast(device_type=device.type, enabled=amp):
+                    after_logits = model(inputs)
+                after = batch_metrics(after_logits.cpu(), targets.cpu(), ece_bins=ece_bins)
+                batch_records.append({"batch": batch_id, "before": before, "after": after,
+                                      "delta": {key: after[key] - before[key] for key in
+                                                 ("entropy", "normalized_entropy", "confidence", "accuracy", "loss", "ece")}})
         totals += torch.tensor(
             (loss.item() * targets.numel(), (logits.argmax(1) == targets).sum().item(), targets.numel()),
             dtype=torch.float64, device=device,
@@ -151,8 +162,24 @@ def run_epoch(model, loader, criterion, device, max_batches, optimizer=None, sca
         dist.all_reduce(totals)
     if totals[2].item() == 0:
         raise ValueError("No batches were processed; increase the batch limit")
-    return {"loss": totals[0].item() / totals[2].item(), "accuracy": totals[1].item() / totals[2].item(),
-            "samples": int(totals[2].item())}
+    result = {"loss": totals[0].item() / totals[2].item(), "accuracy": totals[1].item() / totals[2].item(),
+              "samples": int(totals[2].item())}
+    if collect_batch_metrics:
+        result["batch_metrics"] = batch_records
+    return result
+
+
+def evaluate_entropy(model, loader, device, ece_bins=10, max_batches=None):
+    """Evaluate deterministic loader and aggregate metrics by sample count."""
+    model.eval()
+    records = []
+    with torch.inference_mode():
+        for batch_id, (inputs, targets) in enumerate(loader):
+            if max_batches is not None and batch_id >= max_batches:
+                break
+            logits = model(inputs.to(device, non_blocking=True))
+            records.append(batch_metrics(logits.cpu(), targets, ece_bins=ece_bins))
+    return weighted_average(records)
 
 
 def parse_args(argv=None):
@@ -178,6 +205,7 @@ def parse_args(argv=None):
                         help="One epoch, two train and two test batches by default")
     parser.add_argument("--train-batches", type=int)
     parser.add_argument("--test-batches", type=int)
+    parser.add_argument("--ece-bins", type=int, default=10)
     args = parse_config(parser, argv, path_fields=("data_dir", "output_dir", "resume"))
     if args.smoke and not args.resume:
         args.epochs = 1
@@ -250,6 +278,8 @@ def main():
             raise ValueError("Epochs and batch size must be positive; workers must be non-negative")
         if any(value is not None and value < 1 for value in (args.train_batches, args.test_batches)):
             raise ValueError("Batch limits must be positive")
+        if args.ece_bins < 1:
+            raise ValueError("ECE bins must be positive")
         if args.lr <= 0 or not 0 <= args.label_smoothing < 1 or args.weight_decay < 0 or args.momentum < 0:
             raise ValueError("Invalid optimizer or label smoothing settings")
         if args.seed < 0 or args.seed + world_size - 1 >= 2**32:
@@ -297,6 +327,7 @@ def main():
         torch.backends.cudnn.benchmark = True
         names = class_names(args.data_dir)
         train_data = CIFAR10Pickles(args.data_dir, train=True)
+        train_eval_data = CIFAR10Pickles(args.data_dir, train=True, augment=False)
         test_data = CIFAR10Pickles(args.data_dir, train=False)
         if len(train_data) != 50000 or len(test_data) != 10000 or set(train_data.labels) != set(range(10)) or set(test_data.labels) != set(range(10)):
             raise ValueError("CIFAR-10 sample counts or class coverage are incorrect")
@@ -306,8 +337,14 @@ def main():
         eval_sampler = ExactDistributedEvalSampler(len(test_data), rank, world_size) if world_size > 1 else None
         train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=train_sampler is None,
                                   sampler=train_sampler, num_workers=args.workers, pin_memory=device.type == "cuda")
+        train_eval_loader = DataLoader(train_eval_data, batch_size=args.batch_size, shuffle=False,
+                                       num_workers=args.workers, pin_memory=device.type == "cuda")
         test_loader = DataLoader(test_data, batch_size=args.batch_size, sampler=eval_sampler,
                                  num_workers=args.workers, pin_memory=device.type == "cuda")
+        full_train_eval_loader = DataLoader(train_eval_data, batch_size=args.batch_size, shuffle=False,
+                                            num_workers=args.workers, pin_memory=device.type == "cuda")
+        full_test_eval_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False,
+                                           num_workers=args.workers, pin_memory=device.type == "cuda")
         model = make_model().to(device)
         parameter_count = sum(p.numel() for p in model.parameters())
         optimizer = torch.optim.SGD(model.parameters(), lr=args.lr * args.batch_size * world_size / 128,
@@ -384,6 +421,17 @@ def main():
         train_model = DistributedDataParallel(model, device_ids=[device.index], broadcast_buffers=False) if world_size > 1 else model
         train_criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
         test_criterion = nn.CrossEntropyLoss()
+        if rank == 0:
+            metrics_dir = output_dir / "metrics"
+            metrics_dir.mkdir(parents=True, exist_ok=True)
+            epoch_metrics_path = metrics_dir / "epoch_metrics.jsonl"
+            if not checkpoint:
+                eval_limit = args.test_batches if args.smoke else None
+                epoch_zero = {"epoch": 0, "train": evaluate_entropy(model, full_train_eval_loader, device, max_batches=eval_limit),
+                              "test": evaluate_entropy(model, full_test_eval_loader, device, max_batches=eval_limit)}
+                epoch_metrics_path.write_text(json.dumps(epoch_zero, ensure_ascii=False) + "\n", encoding="utf-8")
+        if world_size > 1:
+            dist.barrier()
         for epoch in range(start_epoch, args.epochs + 1):
             begin = time.monotonic()
             if train_sampler is not None:
@@ -392,12 +440,24 @@ def main():
                 torch.cuda.reset_peak_memory_stats(device)
             lr = optimizer.param_groups[0]["lr"]
             train = run_epoch(train_model, train_loader, train_criterion, device, args.train_batches,
-                              optimizer=optimizer, scaler=scaler, amp=scaler.is_enabled())
+                              optimizer=optimizer, scaler=scaler, amp=scaler.is_enabled(),
+                              ece_bins=args.ece_bins, collect_batch_metrics=rank == 0)
             # Evaluation shards can have unequal sizes; synchronize BN buffers before using the bare model.
             if world_size > 1:
                 for buffer in model.buffers():
                     dist.broadcast(buffer, src=0)
             test = run_epoch(model, test_loader, test_criterion, device, args.test_batches, amp=scaler.is_enabled())
+            if rank == 0:
+                with (output_dir / "metrics/batch_metrics.jsonl").open("a", encoding="utf-8") as stream:
+                    for batch_record in train.get("batch_metrics", []):
+                        stream.write(json.dumps({"epoch": epoch, **batch_record}, ensure_ascii=False) + "\n")
+                entropy_record = {"epoch": epoch,
+                                  "train": evaluate_entropy(model, full_train_eval_loader, device, max_batches=args.test_batches if args.smoke else None),
+                                  "test": evaluate_entropy(model, full_test_eval_loader, device, max_batches=args.test_batches if args.smoke else None)}
+                with (output_dir / "metrics/epoch_metrics.jsonl").open("a", encoding="utf-8") as stream:
+                    stream.write(json.dumps(entropy_record, ensure_ascii=False) + "\n")
+            if world_size > 1:
+                dist.barrier()
             # GradScaler.step delegates to optimizer.step but does not set this scheduler hint.
             optimizer._opt_called = True
             scheduler.step()

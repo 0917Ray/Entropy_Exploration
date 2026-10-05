@@ -19,3 +19,4 @@ amp: true
 smoke: false
 train_batches: null
 test_batches: null
+ece_bins: 10

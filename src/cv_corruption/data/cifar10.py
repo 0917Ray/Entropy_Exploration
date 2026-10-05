@@ -12,7 +12,7 @@ from cv_corruption.models.resnet import MEAN, STD
 
 
 class CIFAR10Pickles(Dataset):
-    def __init__(self, root: str | Path, train: bool):
+    def __init__(self, root: str | Path, train: bool, augment: bool | None = None):
         root = Path(root)
         names = [f"data_batch_{i}" for i in range(1, 6)] if train else ["test_batch"]
         arrays, labels = [], []
@@ -32,8 +32,10 @@ class CIFAR10Pickles(Dataset):
             labels.append(targets)
         self.images = np.concatenate(arrays)
         self.labels = np.concatenate(labels)
+        if augment is None:
+            augment = train
         self.transform = transforms.Compose(
-            ([transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip()] if train else [])
+            ([transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip()] if augment else [])
             + [transforms.ToTensor(), transforms.Normalize(MEAN, STD)]
         )
 
