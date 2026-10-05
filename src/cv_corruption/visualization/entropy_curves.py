@@ -11,12 +11,12 @@ import yaml
 
 
 METRICS = ("entropy", "normalized_entropy", "confidence", "accuracy", "loss", "ece")
-TRAIN_COLOR = "#4F7C65"
-TEST_COLOR = "#A75B73"
-BLUE = "#516480"
+TRAIN_COLOR = "#5E887E"
+TEST_COLOR = "#BA6580"
+BLUE = "#5B7CA7"
 AXIS_COLOR = "#27313d"
-CLASS_COLORS = ["#516480", "#4F7C65", "#A75B73", "#B07A3A", "#6B5B95",
-                "#3F7F82", "#8C6D5A", "#7A8B4A", "#9C5875", "#5F7186"]
+CLASS_COLORS = ["#5B7CA7", "#5E887E", "#BA6580", "#75668A", "#C48755",
+                "#5C8FA3", "#7F8956", "#8A6A58", "#BA6580", "#75668A"]
 
 
 def _load(run_dir: Path):
@@ -64,7 +64,7 @@ def _plot_sparse_observations(ax, x, values, color, label):
 def _line_plot(rows, key, output, ylabel=None):
     epochs = [r["epoch"] for r in rows]
     fig, ax = plt.subplots(figsize=(7.2, 4.6))
-    for split, color in (("train", "#4F7C65"), ("test", "#A75B73")):
+    for split, color in (("train", TRAIN_COLOR), ("test", TEST_COLOR)):
         ax.plot(epochs, [r[split][key] for r in rows], label=split, color=color, linewidth=2)
     ax.set(xlabel="Epoch", ylabel=ylabel or key.replace("_", " ").title())
     for spine in ax.spines.values():
@@ -79,7 +79,7 @@ def _triad(rows, output, delta=False, rate=False):
     epochs = np.asarray([r["epoch"] for r in rows])
     fig, axes = plt.subplots(1, 3, figsize=(13, 4.2), sharex=True)
     for ax, key in zip(axes, ("entropy", "confidence", "accuracy")):
-        for split, color in (("train", "#4F7C65"), ("test", "#A75B73")):
+        for split, color in (("train", TRAIN_COLOR), ("test", TEST_COLOR)):
             values = np.asarray([r[split][key] for r in rows], dtype=float)
             if delta:
                 values = np.diff(values, prepend=values[0])
@@ -199,7 +199,7 @@ def _reliability(rows, output_dir: Path):
         confidence = row["test"]["confidence"]
         accuracy = row["test"]["accuracy"]
         ax.plot([0, 1], [0, 1], "k--", linewidth=1)
-        ax.scatter([confidence], [accuracy], s=80, color="#A75B73", label=f"ECE={row['test']['ece']:.3f}")
+        ax.scatter([confidence], [accuracy], s=80, color=TEST_COLOR, label=f"ECE={row['test']['ece']:.3f}")
         ax.set(xlim=(0, 1), ylim=(0, 1), xlabel="Mean confidence", ylabel="Accuracy",
                title=f"Reliability summary, epoch {epoch}")
         ax.grid(True, linestyle="--", alpha=.3)

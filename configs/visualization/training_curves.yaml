@@ -22,31 +22,31 @@ legend:
   loc: best
 series:
   train_loss:
-    color: '#4F7C65'
+    color: '#5E887E'
     linewidth: 2.0
     line_alpha: 0.92
     marker: o
     marker_size: 5.0
   val_loss:
-    color: '#A75B73'
+    color: '#BA6580'
     linewidth: 2.0
     line_alpha: 0.92
     marker: o
     marker_size: 5.2
   lr:
-    color: '#516480'
+    color: '#5B7CA7'
     linewidth: 2.0
     line_alpha: 0.92
     marker: D
     marker_size: 4.8
   train_accuracy:
-    color: '#4F7C65'
+    color: '#5E887E'
     linewidth: 2.0
     line_alpha: 0.92
     marker: o
     marker_size: 4.5
   val_accuracy:
-    color: '#A75B73'
+    color: '#BA6580'
     linewidth: 2.0
     line_alpha: 0.92
     marker: o

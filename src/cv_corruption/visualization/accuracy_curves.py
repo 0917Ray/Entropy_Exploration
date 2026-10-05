@@ -28,7 +28,7 @@ def render(config_path: Path) -> list[Path]:
     # Accuracy uses the same series interface as loss and learning rate.
     series_config = config.get("series", {})
     legacy = config.get("accuracy", {})
-    legacy_colors = legacy.get("colors", {"train": "#4F7C65", "val": "#A75B73"})
+    legacy_colors = legacy.get("colors", {"train": "#5E887E", "val": "#BA6580"})
     train_style = series_config.get("train_accuracy", {
         "color": legacy_colors["train"], "linewidth": legacy.get("linewidth", 2.0),
         "line_alpha": legacy.get("line_alpha", 0.92), "marker": legacy.get("marker", "o"),

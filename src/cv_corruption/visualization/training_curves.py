@@ -131,9 +131,9 @@ def write_bundle(run_dir: Path, *, smooth: int | None = None, render: bool = Tru
         },
         "plot": {"smooth": int(smooth) if smooth is not None else config.get("plot", {}).get("smooth", 1)},
         "series": {
-            "train_accuracy": {"color": "#4F7C65", "linewidth": 2.0,
+            "train_accuracy": {"color": "#5E887E", "linewidth": 2.0,
                                 "line_alpha": 0.92, "marker": "o", "marker_size": 4.5},
-            "val_accuracy": {"color": "#A75B73", "linewidth": 2.0,
+            "val_accuracy": {"color": "#BA6580", "linewidth": 2.0,
                               "line_alpha": 0.92, "marker": "o", "marker_size": 4.5},
         },
     })
