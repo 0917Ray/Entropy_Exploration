@@ -140,8 +140,15 @@ before/after 的 class-wise 指标也会保留。
 训练成功结束后，程序会自动调用 entropy 绘图器，图片保存到：
 
 ```text
-outputs/entropy/*.png
-outputs/entropy/*.pdf
+outputs/png/entropy/*.png
+outputs/pdf/entropy/*.pdf
+
+原有 loss/accuracy/LR 图位于：
+
+```text
+outputs/png/training_curves/*.png
+outputs/pdf/training_curves/*.pdf
+```
 ```
 
 当前自动生成的图包括：

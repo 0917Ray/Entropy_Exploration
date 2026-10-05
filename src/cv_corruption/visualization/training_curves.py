@@ -45,7 +45,7 @@ def _organize_images(run_dir: Path) -> None:
         if source.suffix.lower() not in {".png", ".pdf"}:
             continue
         stem = source.stem.removeprefix("training_curves_figure_")
-        target = outputs / source.suffix.lower().lstrip(".") / f"{stem}{source.suffix.lower()}"
+        target = outputs / source.suffix.lower().lstrip(".") / "training_curves" / f"{stem}{source.suffix.lower()}"
         target.parent.mkdir(parents=True, exist_ok=True)
         if target.exists():
             target.unlink()

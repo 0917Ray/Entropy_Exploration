@@ -17,10 +17,13 @@ def _load(run_dir: Path):
         return [json.loads(line) for line in stream if line.strip()]
 
 
-def _save(fig, output: Path, dpi=220):
-    output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output.with_suffix(".png"), dpi=dpi, bbox_inches="tight", transparent=True)
-    fig.savefig(output.with_suffix(".pdf"), bbox_inches="tight", transparent=True)
+def _save(fig, output: Path, dpi=300):
+    root = output.parents[1]
+    category = output.parent.name
+    for extension in ("png", "pdf"):
+        target = root / extension / category / f"{output.name}.{extension}"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(target, dpi=dpi, bbox_inches="tight", transparent=True)
     plt.close(fig)
 
 
@@ -30,6 +33,8 @@ def _line_plot(rows, key, output, ylabel=None):
     for split, color in (("train", "#4F7C65"), ("test", "#A75B73")):
         ax.plot(epochs, [r[split][key] for r in rows], label=split, color=color, linewidth=2)
     ax.set(xlabel="Epoch", ylabel=ylabel or key.replace("_", " ").title())
+    for spine in ax.spines.values():
+        spine.set_linewidth(2.0)
     ax.grid(True, linestyle="--", alpha=.3)
     ax.legend()
     fig.tight_layout()
@@ -38,7 +43,7 @@ def _line_plot(rows, key, output, ylabel=None):
 
 def _triad(rows, output, delta=False, rate=False):
     epochs = np.asarray([r["epoch"] for r in rows])
-    fig, axes = plt.subplots(1, 3, figsize=(13, 4), sharex=True)
+    fig, axes = plt.subplots(1, 3, figsize=(13, 4.2), sharex=True)
     for ax, key in zip(axes, ("entropy", "confidence", "accuracy")):
         for split, color in (("train", "#4F7C65"), ("test", "#A75B73")):
             values = np.asarray([r[split][key] for r in rows], dtype=float)
@@ -49,6 +54,8 @@ def _triad(rows, output, delta=False, rate=False):
                 values = np.r_[0.0, np.diff(values) / previous]
             ax.plot(epochs, values, label=split, color=color, linewidth=1.8)
         ax.set_title(key.title())
+        for spine in ax.spines.values():
+            spine.set_linewidth(2.0)
         ax.grid(True, linestyle="--", alpha=.3)
         ax.set_xlabel("Epoch")
     axes[0].set_ylabel("Relative change" if rate else ("Change" if delta else "Value"))
@@ -63,18 +70,20 @@ def _classwise(rows, output_dir: Path):
     selected = [epoch for epoch in selected if epoch in available]
     for epoch in selected:
         row = available[epoch]
-        fig, axes = plt.subplots(1, 3, figsize=(12, 3.8))
+        fig, axes = plt.subplots(1, 3, figsize=(12, 4.0))
         for ax, key in zip(axes, ("entropy", "accuracy", "confidence")):
             values = [row["test"]["classwise"].get(str(c), {}).get(key, np.nan) for c in range(10)]
-            ax.bar(range(10), values, color="#516480")
+            ax.bar(range(10), values, color="#516480", alpha=0.58,
+                   edgecolor="#27313d", linewidth=1.5)
             ax.set_title(key.title())
             ax.set_xlabel("Class")
             ax.grid(axis="y", linestyle="--", alpha=.3)
+            ax.set_axisbelow(True)
         fig.suptitle(f"Test class-wise metrics, epoch {epoch}")
         fig.tight_layout()
         _save(fig, output_dir / f"classwise_epoch_{epoch:03d}")
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.2), sharex=True)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.4), sharex=True)
     epochs = [r["epoch"] for r in rows]
     for class_id in range(10):
         for ax, key in zip(axes, ("entropy", "accuracy")):
@@ -83,6 +92,8 @@ def _classwise(rows, output_dir: Path):
             ax.set_title(f"Class-wise {key}")
             ax.set_xlabel("Epoch")
             ax.grid(True, linestyle="--", alpha=.3)
+            for spine in ax.spines.values():
+                spine.set_linewidth(2.0)
     axes[1].legend(title="Class", ncol=2, fontsize=8)
     fig.tight_layout()
     _save(fig, output_dir / "classwise_over_epoch")

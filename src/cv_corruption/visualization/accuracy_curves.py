@@ -64,7 +64,7 @@ def render(config_path: Path) -> list[Path]:
         ax.legend(loc="best")
         fig.tight_layout()
         for extension in ("png", "pdf") if config["output"]["pdf"] else ("png",):
-            path = output_dir / extension / f"{suffix}.{extension}"
+            path = output_dir / extension / "training_curves" / f"{suffix}.{extension}"
             path.parent.mkdir(parents=True, exist_ok=True)
             fig.savefig(path, dpi=dpi, transparent=transparent, bbox_inches="tight")
             outputs.append(path)
