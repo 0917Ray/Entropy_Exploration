@@ -10,8 +10,13 @@ from cv_corruption.visualization.entropy_curves import render_entropy_bundle
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-dir", type=Path, required=True)
+    parser.add_argument("--config", type=Path,
+                        default=Path("configs/visualization/entropy_curves.yaml"))
     args = parser.parse_args(argv)
-    output = render_entropy_bundle(args.run_dir.expanduser().resolve())
+    config = args.config.expanduser()
+    if not config.is_absolute():
+        config = Path.cwd() / config
+    output = render_entropy_bundle(args.run_dir.expanduser().resolve(), config)
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
     logging.info("Saved entropy figures in %s", output)
 

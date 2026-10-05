@@ -511,7 +511,7 @@ def main():
                 progress.close()
             try:
                 write_bundle(output_dir, render=True)
-                render_entropy_bundle(output_dir)
+                render_entropy_bundle(output_dir, PROJECT_ROOT / "CV_Corruption/configs/visualization/entropy_curves.yaml")
                 logging.getLogger(__name__).success("DONE    training complete | curves=%s", output_dir)
             except (FileNotFoundError, OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
                 logging.getLogger(__name__).warning("Training completed, but curve rendering failed: %s", exc)

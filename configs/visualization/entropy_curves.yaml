@@ -1,0 +1,6 @@
+# Class ids in this file are human-facing and 1-based: CIFAR-10 classes are 1..10.
+class_index_base: 1
+class_groups:
+  - [1, 10]
+  - [2, 3, 4]
+include_aggregate_classwise: false

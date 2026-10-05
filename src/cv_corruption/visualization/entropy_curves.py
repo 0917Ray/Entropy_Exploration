@@ -7,6 +7,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import yaml
 
 
 METRICS = ("entropy", "normalized_entropy", "confidence", "accuracy", "loss", "ece")
@@ -95,7 +96,7 @@ def _triad(rows, output, delta=False, rate=False):
     _save(fig, output)
 
 
-def _classwise(rows, output_dir: Path):
+def _classwise(rows, output_dir: Path, config: dict):
     selected = [0, 10, 50, 100]
     available = {r["epoch"]: r for r in rows}
     selected = [epoch for epoch in selected if epoch in available]
@@ -118,6 +119,56 @@ def _classwise(rows, output_dir: Path):
         fig.tight_layout()
         _save(fig, output_dir / f"classwise_epoch_{epoch:03d}")
 
+    class_groups = config.get("class_groups", [[1, 10], [2, 3, 4]])
+    index_base = int(config.get("class_index_base", 1))
+    if index_base not in (0, 1):
+        raise ValueError("class_index_base must be 0 or 1")
+    normalized_groups = []
+    for group in class_groups:
+        ids = [int(value) - index_base for value in group]
+        if not ids or any(class_id < 0 or class_id >= 10 for class_id in ids):
+            raise ValueError("class_groups must contain valid CIFAR-10 class ids")
+        normalized_groups.append(ids)
+
+    # One line figure per class keeps scale and color consistent across classes.
+    epochs = [r["epoch"] for r in rows]
+    for class_id in range(10):
+        fig, axes = plt.subplots(1, 2, figsize=(10, 3.8), sharex=True)
+        for ax, key in zip(axes, ("entropy", "accuracy")):
+            values = [r["test"]["classwise"].get(str(class_id), {}).get(key, np.nan) for r in rows]
+            axes_color = BLUE
+            ax.plot(epochs, values, color=axes_color, linewidth=2.0, alpha=.95)
+            ax.set_title(f"Class {class_id + index_base} {key}")
+            ax.set_xlabel("Epoch")
+            if key == "accuracy":
+                ax.set_ylim(0, 1.0)
+            _style_axis(ax)
+        fig.suptitle(f"Class {class_id + index_base}: entropy and accuracy")
+        fig.tight_layout()
+        _save(fig, output_dir / f"class_{class_id + index_base:02d}_over_epoch")
+
+    # Configurable groups, each group rendered as one two-panel figure.
+    for group in normalized_groups:
+        labels = [str(class_id + index_base) for class_id in group]
+        fig, axes = plt.subplots(1, 2, figsize=(10, 3.8), sharex=True)
+        for class_id, label in zip(group, labels):
+            for ax, key in zip(axes, ("entropy", "accuracy")):
+                values = [r["test"]["classwise"].get(str(class_id), {}).get(key, np.nan) for r in rows]
+                ax.plot(epochs, values, color=BLUE, linewidth=1.9, alpha=.95, label=f"Class {label}")
+                ax.set_title(f"Class-wise {key}")
+                ax.set_xlabel("Epoch")
+                if key == "accuracy":
+                    ax.set_ylim(0, 1.0)
+                _style_axis(ax)
+        axes[0].legend(frameon=True, loc="best")
+        fig.suptitle("Classes " + ", ".join(labels) + ": entropy and accuracy")
+        fig.tight_layout()
+        suffix = "_".join(f"{class_id + index_base:02d}" for class_id in group)
+        _save(fig, output_dir / f"classes_{suffix}_over_epoch")
+
+    # Preserve a compact aggregate CSV-style figure only through the explicit config switch.
+    if not config.get("include_aggregate_classwise", False):
+        return
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.4), sharex=True)
     epochs = [r["epoch"] for r in rows]
     for class_id in range(10):
@@ -191,17 +242,21 @@ def _batch_plot(run_dir: Path, output_dir: Path):
     fig.tight_layout(); _save(fig, output_dir / "batch_transfer_effect")
 
 
-def render_entropy_bundle(run_dir: Path) -> Path:
+def render_entropy_bundle(run_dir: Path, config_path: Path | None = None) -> Path:
     """Render all entropy figures and return the output directory."""
     run_dir = Path(run_dir)
     rows = _load(run_dir)
+    config = {}
+    if config_path:
+        with Path(config_path).open(encoding="utf-8") as stream:
+            config = yaml.safe_load(stream) or {}
     output_dir = run_dir / "outputs/entropy"
     for key in METRICS:
         _line_plot(rows, key, output_dir / f"epoch_{key}")
     _triad(rows, output_dir / "epoch_entropy_confidence_accuracy")
     _triad(rows, output_dir / "epoch_entropy_confidence_accuracy_delta", delta=True)
     _triad(rows, output_dir / "epoch_entropy_confidence_accuracy_rate", rate=True)
-    _classwise(rows, output_dir)
+    _classwise(rows, output_dir, config)
     _reliability(rows, output_dir)
     _batch_plot(run_dir, output_dir)
     return output_dir

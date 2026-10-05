@@ -156,7 +156,8 @@ outputs/pdf/training_curves/*.pdf
 - train/test entropy、normalized entropy、confidence、accuracy、loss、ECE 曲线；
 - entropy-confidence-accuracy 的绝对值、epoch 差分和变化率；
 - epoch 0/10/50/100（若存在）的 class-wise entropy、accuracy、confidence；
-- 每个类别随 epoch 的 entropy 和 accuracy；
+- 每个类别单独的 entropy/accuracy 随 epoch 图；
+- 按配置分组的 class-wise entropy/accuracy 图；
 - epoch 0、早期、中期和最终 checkpoint 的 reliability summary；
 - batch entropy/loss 以及相邻 batch transfer effect。
 
@@ -165,6 +166,26 @@ outputs/pdf/training_curves/*.pdf
 ```bash
 cv-plot-entropy \
   --run-dir runs/entropy_seed0_4gpu_20261005-123039
+```
+
+class-wise 绘图由 `configs/visualization/entropy_curves.yaml` 控制。配置中的 class 编号
+默认使用人类习惯的 1-based 编号（1 到 10），例如：
+
+```yaml
+class_index_base: 1
+class_groups:
+  - [1, 10]
+  - [2, 3, 4]
+include_aggregate_classwise: false
+```
+
+这会生成十张单 class 图，以及两张分组图（classes 1/10 和 classes 2/3/4）。修改配置后
+重跑同一条 `cv-plot-entropy` 命令即可；也可以指定其他配置文件：
+
+```bash
+cv-plot-entropy \
+  --run-dir runs/entropy_seed0_4gpu_20261005-123039 \
+  --config configs/visualization/entropy_curves.yaml
 ```
 
 如果尚未执行 `pip install -e .`，也可以直接使用模块入口：
