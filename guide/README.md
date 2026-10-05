@@ -12,6 +12,7 @@ python -m pip install -e CV_Corruption
 - [环境与安装](setup.md)
 - [项目架构](architecture.md)
 - [训练](training.md)
+- [Experiment 1：Entropy 监测](entropy_experiment.md)
 - [CIFAR-10-C 评测](evaluation.md)
 - [可视化](visualization.md)
 - 训练完成后可使用 `cv-plot-training --run-dir <run>` 生成或重绘 loss/LR 曲线。
