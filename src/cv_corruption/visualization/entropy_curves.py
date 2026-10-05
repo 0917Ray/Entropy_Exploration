@@ -214,8 +214,8 @@ def _batch_plot(run_dir: Path, output_dir: Path):
         return
     rows = [json.loads(line) for line in path.open(encoding="utf-8") if line.strip()]
     x = np.arange(len(rows))
-    fig, axes = plt.subplots(2, 1, figsize=(9.2, 7.2), sharex=True)
-    for ax, key in zip(axes, ("entropy", "loss")):
+    for key in ("entropy", "loss"):
+        fig, ax = plt.subplots(figsize=(9.2, 4.8))
         before = np.asarray([r["before"][key] for r in rows])
         after = np.asarray([r["after"][key] for r in rows])
         _plot_sparse_observations(ax, x, before, TRAIN_COLOR, "Before (observed)")
@@ -225,11 +225,11 @@ def _batch_plot(run_dir: Path, output_dir: Path):
         ax.set_ylabel(key.title())
         _style_axis(ax)
         ax.legend(frameon=True, loc="best")
-    axes[-1].set_xlabel("Recorded batch")
-    fig.tight_layout(); _save(fig, output_dir / "batch_entropy_loss")
+        ax.set_xlabel("Recorded batch")
+        fig.tight_layout(); _save(fig, output_dir / f"batch_{key}")
 
-    fig, axes = plt.subplots(2, 1, figsize=(9.2, 7.2), sharex=True)
-    for ax, key, color in zip(axes, ("entropy", "loss"), (TRAIN_COLOR, TEST_COLOR)):
+    for key, color in (("entropy", TRAIN_COLOR), ("loss", TEST_COLOR)):
+        fig, ax = plt.subplots(figsize=(9.2, 4.8))
         values = np.asarray([r["delta"][key] for r in rows])
         _plot_sparse_observations(ax, x, values, color, "Observed")
         ax.plot(x, _moving_average(values, window=101), color=color, alpha=.98, linewidth=2.2,
@@ -242,8 +242,8 @@ def _batch_plot(run_dir: Path, output_dir: Path):
         ax.set_title(key.title())
         _style_axis(ax)
         ax.legend(frameon=True, loc="best")
-    axes[-1].set_xlabel("Recorded batch")
-    fig.tight_layout(); _save(fig, output_dir / "batch_transfer_effect")
+        ax.set_xlabel("Recorded batch")
+        fig.tight_layout(); _save(fig, output_dir / f"batch_transfer_{key}")
 
 
 def render_entropy_bundle(run_dir: Path, config_path: Path | None = None) -> Path:

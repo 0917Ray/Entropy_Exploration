@@ -161,6 +161,15 @@ outputs/pdf/training_curves/*.pdf
 - epoch 0、早期、中期和最终 checkpoint 的 reliability summary；
 - batch entropy/loss 以及相邻 batch transfer effect。
 
+batch 图分别输出为：
+
+```text
+batch_entropy.pdf/png
+batch_loss.pdf/png
+batch_transfer_entropy.pdf/png
+batch_transfer_loss.pdf/png
+```
+
 已有 run 不需要重新训练，可以单独重绘：
 
 ```bash
