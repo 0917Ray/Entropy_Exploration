@@ -15,6 +15,8 @@ TRAIN_COLOR = "#4F7C65"
 TEST_COLOR = "#A75B73"
 BLUE = "#516480"
 AXIS_COLOR = "#27313d"
+CLASS_COLORS = ["#516480", "#4F7C65", "#A75B73", "#B07A3A", "#6B5B95",
+                "#3F7F82", "#8C6D5A", "#7A8B4A", "#9C5875", "#5F7186"]
 
 
 def _load(run_dir: Path):
@@ -84,7 +86,9 @@ def _triad(rows, output, delta=False, rate=False):
             if rate:
                 previous = np.maximum(np.abs(values[:-1]), 1e-12)
                 values = np.r_[0.0, np.diff(values) / previous]
-            ax.plot(epochs, values, label=split, color=color, linewidth=1.8)
+            ax.plot(epochs, values, label=f"{split} observed", color=color, linewidth=1.0, alpha=.18)
+            ax.plot(epochs, _moving_average(values, window=11), label=f"{split} smoothed",
+                    color=color, linewidth=2.2, alpha=.96)
         ax.set_title(key.title())
         for spine in ax.spines.values():
             spine.set_linewidth(2.0)
@@ -130,41 +134,41 @@ def _classwise(rows, output_dir: Path, config: dict):
             raise ValueError("class_groups must contain valid CIFAR-10 class ids")
         normalized_groups.append(ids)
 
-    # One line figure per class keeps scale and color consistent across classes.
+    # One file per class and metric keeps comparisons uncluttered.
     epochs = [r["epoch"] for r in rows]
     for class_id in range(10):
-        fig, axes = plt.subplots(1, 2, figsize=(10, 3.8), sharex=True)
-        for ax, key in zip(axes, ("entropy", "accuracy")):
+        for key in ("entropy", "accuracy"):
             values = [r["test"]["classwise"].get(str(class_id), {}).get(key, np.nan) for r in rows]
-            axes_color = BLUE
-            ax.plot(epochs, values, color=axes_color, linewidth=2.0, alpha=.95)
-            ax.set_title(f"Class {class_id + index_base} {key}")
+            fig, ax = plt.subplots(figsize=(7.2, 4.6))
+            ax.plot(epochs, values, color=BLUE, linewidth=2.1, alpha=.95)
+            ax.set_title(f"Class {class_id + index_base}: {key.title()}")
             ax.set_xlabel("Epoch")
+            ax.set_ylabel(key.title())
             if key == "accuracy":
                 ax.set_ylim(0, 1.0)
             _style_axis(ax)
-        fig.suptitle(f"Class {class_id + index_base}: entropy and accuracy")
-        fig.tight_layout()
-        _save(fig, output_dir / f"class_{class_id + index_base:02d}_over_epoch")
+            fig.tight_layout()
+            _save(fig, output_dir / f"class_{class_id + index_base:02d}_{key}_over_epoch")
 
-    # Configurable groups, each group rendered as one two-panel figure.
+    # Configurable groups, with separate entropy and accuracy figures.
     for group in normalized_groups:
         labels = [str(class_id + index_base) for class_id in group]
-        fig, axes = plt.subplots(1, 2, figsize=(10, 3.8), sharex=True)
-        for class_id, label in zip(group, labels):
-            for ax, key in zip(axes, ("entropy", "accuracy")):
-                values = [r["test"]["classwise"].get(str(class_id), {}).get(key, np.nan) for r in rows]
-                ax.plot(epochs, values, color=BLUE, linewidth=1.9, alpha=.95, label=f"Class {label}")
-                ax.set_title(f"Class-wise {key}")
-                ax.set_xlabel("Epoch")
-                if key == "accuracy":
-                    ax.set_ylim(0, 1.0)
-                _style_axis(ax)
-        axes[0].legend(frameon=True, loc="best")
-        fig.suptitle("Classes " + ", ".join(labels) + ": entropy and accuracy")
-        fig.tight_layout()
         suffix = "_".join(f"{class_id + index_base:02d}" for class_id in group)
-        _save(fig, output_dir / f"classes_{suffix}_over_epoch")
+        for key in ("entropy", "accuracy"):
+            fig, ax = plt.subplots(figsize=(7.4, 4.8))
+            for class_id, label in zip(group, labels):
+                values = [r["test"]["classwise"].get(str(class_id), {}).get(key, np.nan) for r in rows]
+                ax.plot(epochs, values, color=CLASS_COLORS[class_id], linewidth=2.0,
+                        alpha=.95, label=f"Class {label}")
+            ax.set_title("Classes " + ", ".join(labels) + f": {key.title()}")
+            ax.set_xlabel("Epoch")
+            ax.set_ylabel(key.title())
+            if key == "accuracy":
+                ax.set_ylim(0, 1.0)
+            _style_axis(ax)
+            ax.legend(frameon=True, loc="best")
+            fig.tight_layout()
+            _save(fig, output_dir / f"classes_{suffix}_{key}_over_epoch")
 
     # Preserve a compact aggregate CSV-style figure only through the explicit config switch.
     if not config.get("include_aggregate_classwise", False):

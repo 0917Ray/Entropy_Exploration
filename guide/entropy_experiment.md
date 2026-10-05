@@ -179,8 +179,18 @@ class_groups:
 include_aggregate_classwise: false
 ```
 
-这会生成十张单 class 图，以及两张分组图（classes 1/10 和 classes 2/3/4）。修改配置后
+这会生成每个 class 独立的 entropy/accuracy 图（共 20 张），以及分开的分组 entropy/accuracy
+图（classes 1/10 和 classes 2/3/4）。不同 class 在分组图中使用不同颜色。修改配置后
 重跑同一条 `cv-plot-entropy` 命令即可；也可以指定其他配置文件：
+
+输出文件示例：
+
+```text
+class_01_entropy_over_epoch.pdf
+class_01_accuracy_over_epoch.pdf
+classes_01_10_entropy_over_epoch.pdf
+classes_01_10_accuracy_over_epoch.pdf
+```
 
 ```bash
 cv-plot-entropy \
