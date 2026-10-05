@@ -10,6 +10,10 @@ import numpy as np
 
 
 METRICS = ("entropy", "normalized_entropy", "confidence", "accuracy", "loss", "ece")
+TRAIN_COLOR = "#4F7C65"
+TEST_COLOR = "#A75B73"
+BLUE = "#516480"
+AXIS_COLOR = "#27313d"
 
 
 def _load(run_dir: Path):
@@ -25,6 +29,33 @@ def _save(fig, output: Path, dpi=300):
         target.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(target, dpi=dpi, bbox_inches="tight", transparent=True)
     plt.close(fig)
+
+
+def _style_axis(ax, *, y_grid=True):
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_color(AXIS_COLOR)
+        spine.set_linewidth(2.5)
+    ax.tick_params(width=1.8, length=5, color=AXIS_COLOR)
+    ax.set_axisbelow(True)
+    ax.grid(axis="y" if y_grid else "both", linestyle="--", linewidth=.8, alpha=.28)
+
+
+def _moving_average(values, window=49):
+    values = np.asarray(values, dtype=float)
+    if values.size < window:
+        return values
+    kernel = np.ones(window) / window
+    padded = np.pad(values, (window // 2, window - 1 - window // 2), mode="edge")
+    return np.convolve(padded, kernel, mode="valid")
+
+
+def _plot_sparse_observations(ax, x, values, color, label):
+    stride = max(1, len(values) // 400)
+    sample_x = x[::stride]
+    sample_values = np.asarray(values)[::stride]
+    ax.plot(sample_x, sample_values, color=color, alpha=.18, linewidth=.65,
+            marker=".", markersize=1.8, label=label)
 
 
 def _line_plot(rows, key, output, ylabel=None):
@@ -73,12 +104,16 @@ def _classwise(rows, output_dir: Path):
         fig, axes = plt.subplots(1, 3, figsize=(12, 4.0))
         for ax, key in zip(axes, ("entropy", "accuracy", "confidence")):
             values = [row["test"]["classwise"].get(str(c), {}).get(key, np.nan) for c in range(10)]
-            ax.bar(range(10), values, color="#516480", alpha=0.58,
-                   edgecolor="#27313d", linewidth=1.5)
+            ax.bar(range(10), values, width=.68, color=BLUE, alpha=0.50,
+                   edgecolor=AXIS_COLOR, linewidth=2.0)
             ax.set_title(key.title())
             ax.set_xlabel("Class")
-            ax.grid(axis="y", linestyle="--", alpha=.3)
-            ax.set_axisbelow(True)
+            ax.set_xticks(range(10))
+            if key in {"accuracy", "confidence"}:
+                ax.set_ylim(0, 1.0)
+            else:
+                ax.set_ylim(0, max(values) * 1.12)
+            _style_axis(ax)
         fig.suptitle(f"Test class-wise metrics, epoch {epoch}")
         fig.tight_layout()
         _save(fig, output_dir / f"classwise_epoch_{epoch:03d}")
@@ -124,19 +159,36 @@ def _batch_plot(run_dir: Path, output_dir: Path):
         return
     rows = [json.loads(line) for line in path.open(encoding="utf-8") if line.strip()]
     x = np.arange(len(rows))
-    fig, axes = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=(9.2, 7.2), sharex=True)
     for ax, key in zip(axes, ("entropy", "loss")):
-        ax.plot(x, [r["before"][key] for r in rows], alpha=.55, label="before")
-        ax.plot(x, [r["after"][key] for r in rows], alpha=.8, label="after")
-        ax.set_ylabel(key.title()); ax.grid(True, linestyle="--", alpha=.3); ax.legend()
+        before = np.asarray([r["before"][key] for r in rows])
+        after = np.asarray([r["after"][key] for r in rows])
+        _plot_sparse_observations(ax, x, before, TRAIN_COLOR, "Before (observed)")
+        _plot_sparse_observations(ax, x, after, TEST_COLOR, "After (observed)")
+        ax.plot(x, _moving_average(before, window=101), color=TRAIN_COLOR, linewidth=2.2, alpha=.98, label="Before (smoothed)")
+        ax.plot(x, _moving_average(after, window=101), color=TEST_COLOR, linewidth=2.2, alpha=.98, label="After (smoothed)")
+        ax.set_ylabel(key.title())
+        _style_axis(ax)
+        ax.legend(frameon=True, loc="best")
     axes[-1].set_xlabel("Recorded batch")
     fig.tight_layout(); _save(fig, output_dir / "batch_entropy_loss")
 
-    fig, ax = plt.subplots(figsize=(9, 4))
-    for key, color in (("entropy", "#4F7C65"), ("loss", "#A75B73")):
-        ax.plot(x, [r["delta"][key] for r in rows], label=f"Delta {key}", color=color, linewidth=1)
-    ax.axhline(0, color="black", linewidth=.8); ax.set(xlabel="Recorded batch", ylabel="After - before")
-    ax.grid(True, linestyle="--", alpha=.3); ax.legend(); fig.tight_layout(); _save(fig, output_dir / "batch_transfer_effect")
+    fig, axes = plt.subplots(2, 1, figsize=(9.2, 7.2), sharex=True)
+    for ax, key, color in zip(axes, ("entropy", "loss"), (TRAIN_COLOR, TEST_COLOR)):
+        values = np.asarray([r["delta"][key] for r in rows])
+        _plot_sparse_observations(ax, x, values, color, "Observed")
+        ax.plot(x, _moving_average(values, window=101), color=color, alpha=.98, linewidth=2.2,
+                label=f"Delta {key} (smoothed)")
+        ax.axhline(0, color=AXIS_COLOR, linewidth=1.1)
+        lower, upper = np.quantile(values, [.01, .99])
+        margin = max((upper - lower) * .12, 1e-4)
+        ax.set_ylim(lower - margin, upper + margin)
+        ax.set_ylabel("After - before")
+        ax.set_title(key.title())
+        _style_axis(ax)
+        ax.legend(frameon=True, loc="best")
+    axes[-1].set_xlabel("Recorded batch")
+    fig.tight_layout(); _save(fig, output_dir / "batch_transfer_effect")
 
 
 def render_entropy_bundle(run_dir: Path) -> Path:
