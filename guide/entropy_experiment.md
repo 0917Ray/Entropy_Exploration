@@ -135,6 +135,43 @@ checkpoints/                  # last.pt 和 best.pt
 `delta[q] = after[q] - before[q]`，表示同一 batch 在一次参数更新前后的 transfer effect。
 before/after 的 class-wise 指标也会保留。
 
+## 绘图
+
+训练成功结束后，程序会自动调用 entropy 绘图器，图片保存到：
+
+```text
+outputs/entropy/*.png
+outputs/entropy/*.pdf
+```
+
+当前自动生成的图包括：
+
+- train/test entropy、normalized entropy、confidence、accuracy、loss、ECE 曲线；
+- entropy-confidence-accuracy 的绝对值、epoch 差分和变化率；
+- epoch 0/10/50/100（若存在）的 class-wise entropy、accuracy、confidence；
+- 每个类别随 epoch 的 entropy 和 accuracy；
+- epoch 0、早期、中期和最终 checkpoint 的 reliability summary；
+- batch entropy/loss 以及相邻 batch transfer effect。
+
+已有 run 不需要重新训练，可以单独重绘：
+
+```bash
+cv-plot-entropy \
+  --run-dir runs/entropy_seed0_4gpu_20261005-123039
+```
+
+如果尚未执行 `pip install -e .`，也可以直接使用模块入口：
+
+```bash
+PYTHONPATH=src python -m cv_corruption.cli.plot_entropy \
+  --run-dir runs/entropy_seed0_4gpu_20261005-123039
+```
+
+绘图器只读取 `metrics/epoch_metrics.jsonl` 和 `metrics/batch_metrics.jsonl`，不会重新加载
+模型或数据集。当前 run 保存的是 aggregate confidence/accuracy/ECE，因此 reliability 图
+以 mean confidence-accuracy 点和 ECE 标注呈现；后续若保存逐 bin calibration counts，可
+扩展为完整的 bin reliability diagram。
+
 ## 检查结果
 
 运行回归测试：
@@ -144,8 +181,8 @@ python -m unittest discover -s tests -v
 ```
 
 当前实现已覆盖指标计算、样本加权、ECE bin 配置和 batch transfer effect 的数据记录。
-entropy-confidence-accuracy 曲线、指定 epoch 的 class-wise 图和 reliability diagram 使用
-上述 JSONL 数据离线生成；绘图 CLI 将在后续实验迭代中补充。
+entropy-confidence-accuracy 曲线、指定 epoch 的 class-wise 图和 reliability summary 可
+使用上述 CLI 离线生成。
 
 ## 与 Experiment 2 的边界
 

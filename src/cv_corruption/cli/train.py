@@ -32,6 +32,7 @@ from cv_corruption.data.cifar10 import CIFAR10Pickles, class_names
 from cv_corruption.models.resnet import MEAN, STD, make_model
 from cv_corruption.config.loader import parse_config, save_config
 from cv_corruption.visualization.training_curves import write_bundle
+from cv_corruption.visualization.entropy_curves import render_entropy_bundle
 from cv_corruption.evaluation.metrics import batch_metrics, weighted_average
 
 
@@ -510,6 +511,7 @@ def main():
                 progress.close()
             try:
                 write_bundle(output_dir, render=True)
+                render_entropy_bundle(output_dir)
                 logging.getLogger(__name__).success("DONE    training complete | curves=%s", output_dir)
             except (FileNotFoundError, OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
                 logging.getLogger(__name__).warning("Training completed, but curve rendering failed: %s", exc)

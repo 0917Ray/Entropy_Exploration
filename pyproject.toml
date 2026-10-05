@@ -28,6 +28,7 @@ cv-visualize-examples = "cv_corruption.cli.visualize_examples:main"
 cv-visualize-tiny-imagenet = "cv_corruption.cli.visualize_tiny_imagenet_c:main"
 cv-plot-corruption-counts = "cv_corruption.cli.plot_corruption_counts:main"
 cv-plot-training = "cv_corruption.cli.plot_training:main"
+cv-plot-entropy = "cv_corruption.cli.plot_entropy:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
