@@ -1,0 +1,12 @@
+# Run clean training first to produce this checkpoint.
+checkpoint: runs/cifar10_resnet50_full/checkpoints/best.pt
+data_dir: data/raw/cifar10_c/CIFAR-10-C
+clean_data_dir: data/raw/cifar10/cifar-10-batches-py
+output: runs/cifar10_resnet50_full/cifar10_c_metrics.json
+corruptions: [gaussian_noise, shot_noise, impulse_noise, defocus_blur, glass_blur, motion_blur, zoom_blur, snow, frost, fog, brightness, contrast, elastic_transform, pixelate, jpeg_compression]
+severities: [1, 2, 3, 4, 5]
+limit: null
+batch_size: 256
+workers: 4
+gpu_id: 0
+cpu: false

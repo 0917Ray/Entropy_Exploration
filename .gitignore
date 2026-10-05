@@ -1,0 +1,16 @@
+# Large local payloads; keep the dataset README and loader tracked.
+datasets/*/raw/
+.downloads/
+data/raw/**
+runs/**
+*.pt
+*.pth
+*.tar
+*.tar.gz
+*.zip
+*.npy
+*.npz
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/

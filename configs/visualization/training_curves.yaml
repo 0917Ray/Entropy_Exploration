@@ -1,0 +1,56 @@
+# Project-wide defaults for ResNet-50 training curves.
+# A run receives a resolved JSON copy in its own output directory.
+plot:
+  mode: all-separate
+  smooth: 1
+  title: null
+figure:
+  figsize: [12, 4.5]
+  panel_figsize: [7.4, 5.8]
+  dpi: 300
+  spine_width: 2.5
+  transparent: true
+axis:
+  xlabel: Epoch
+  x_integer: true
+  grid: true
+  target_x_ticks: 9
+  target_y_ticks: 7
+  y_margin: 0.07
+legend:
+  enabled: true
+  loc: best
+series:
+  train_loss:
+    color: '#4F7C65'
+    linewidth: 2.0
+    line_alpha: 0.92
+    marker: o
+    marker_size: 5.0
+  val_loss:
+    color: '#A75B73'
+    linewidth: 2.0
+    line_alpha: 0.92
+    marker: o
+    marker_size: 5.2
+  lr:
+    color: '#516480'
+    linewidth: 2.0
+    line_alpha: 0.92
+    marker: D
+    marker_size: 4.8
+  train_accuracy:
+    color: '#4F7C65'
+    linewidth: 2.0
+    line_alpha: 0.92
+    marker: o
+    marker_size: 4.5
+  val_accuracy:
+    color: '#A75B73'
+    linewidth: 2.0
+    line_alpha: 0.92
+    marker: o
+    marker_size: 4.5
+output:
+  filename: training_curves_figure.png
+  pdf: true

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cv-corruption"
+version = "0.1.0"
+description = "Training, corruption evaluation and visualization experiments"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "Pillow",
+  "PyYAML",
+  "torch",
+  "torchvision",
+  "tqdm",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+plot = ["matplotlib"]
+
+[project.scripts]
+cv-train = "cv_corruption.cli.train:main"
+cv-evaluate = "cv_corruption.cli.evaluate:main"
+cv-visualize = "cv_corruption.cli.visualize_cifar10_c:main"
+cv-visualize-examples = "cv_corruption.cli.visualize_examples:main"
+cv-visualize-tiny-imagenet = "cv_corruption.cli.visualize_tiny_imagenet_c:main"
+cv-plot-corruption-counts = "cv_corruption.cli.plot_corruption_counts:main"
+cv-plot-training = "cv_corruption.cli.plot_training:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

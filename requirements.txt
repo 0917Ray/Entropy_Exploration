@@ -1,0 +1,7 @@
+# PyTorch and torchvision are installed separately from the official CUDA 12.8
+# wheel index; see CV_Corruption/guide/setup.md.
+numpy>=1.26,<3
+Pillow>=10,<12
+matplotlib>=3.8,<4
+PyYAML>=6,<7
+tqdm>=4.66,<5

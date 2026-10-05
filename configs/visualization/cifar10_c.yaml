@@ -1,0 +1,44 @@
+data: data/raw/cifar10_c/CIFAR-10-C
+clean: data/raw/cifar10/cifar-10-batches-py/test_batch
+output: runs/visualizations/cifar10_c
+# All 19 available types for visualization; evaluation uses the standard 15.
+groups:
+  noise: [gaussian_noise, shot_noise, impulse_noise, speckle_noise]
+  blur: [defocus_blur, glass_blur, motion_blur, zoom_blur, gaussian_blur]
+  weather: [snow, frost, fog, brightness, spatter, saturate]
+  digital: [contrast, elastic_transform, pixelate, jpeg_compression]
+corruptions: null  # null selects all members of groups
+severities: [1, 2, 3, 4, 5]
+selected_label: 0
+selected_index: null  # absolute test index; must belong to selected_label
+sample_index: 0
+labels: [airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck]
+overview_figsize: [10.5, 31]
+level5_figsize: [16, 5.2]
+classes_figsize: [10, 5.2]
+group_width: 10.5
+row_height: 1.7
+dpi: 180
+font_size: 14
+title_font_size: 20
+row_font_size: 13
+class_font_size: 14
+label_pad: 34
+interpolation: nearest
+save_png: true
+save_pdf: true
+show_title: false
+border_width: 1.8
+border_color: '#3A3D42'
+level5_border_color: '#D55E00'
+pad_inches: 0.2
+transparent: true
+title_y: 0.998
+column_title_pad: 8.0
+level5_title_y: 0.98
+level5_legend_anchor: [0.5, 0.05]
+class_title_pad: 10.0
+generate_overview: true
+generate_level5_overview: true
+generate_groups: true
+generate_classes: true

@@ -1,0 +1,46 @@
+data: data/raw/tiny_imagenet_c/Tiny-ImageNet-C
+clean: data/raw/tiny_imagenet_c/tiny-imagenet-200
+output: runs/visualizations/tiny_imagenet_c
+report_path: null  # null writes output/report.md
+groups:
+  noise: [gaussian_noise, shot_noise, impulse_noise]
+  blur: [defocus_blur, glass_blur, motion_blur, zoom_blur]
+  weather: [snow, frost, fog, brightness]
+  digital: [contrast, elastic_transform, pixelate, jpeg_compression]
+selected_label: n01443537
+severities: [1, 2, 3, 4, 5]
+sample_index: 0
+# every_10th uses class_stride; alternatives: first, random, all.
+sample_selection: every_10th
+class_stride: 10
+class_count: 20
+class_columns: 5
+seed: 42
+tile_size: 160
+tile_gap: 8
+row_gap: 36
+row_label_width: 200
+font_size: 18
+title_font_size: 22
+font_path: null  # Pillow's DejaVuSans.ttf; override with a TTF path
+text_color: '#24282d'
+background: white
+transparent: true
+title_x: 20
+title_y: 10
+border_color: '#3A3D42'
+border_width: 3
+interpolation: nearest
+dpi: 160
+match_corruption: jpeg_compression
+match_severity: 1
+match_size: 16
+save_png: true
+save_pdf: true
+show_title: true
+write_metadata: true
+write_manifest: true
+write_report: true
+generate_overview: true
+generate_groups: true
+generate_classes: true

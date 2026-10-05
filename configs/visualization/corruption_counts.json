@@ -1,0 +1,24 @@
+{
+  "data": {
+    "input": "../runs/visualizations/tiny_imagenet_c/statistics/corruption_totals.csv",
+    "source": "Tiny ImageNet-C condition_counts.csv aggregated over configured severities",
+    "mode": "single",
+    "label_column": "corruption",
+    "value_column": "count"
+  },
+  "figure": {"figsize": [13, 5.5]},
+  "font": {"sans_serif": ["DejaVu Sans"], "size": 12, "title_size": 13, "tick_size": 11},
+  "bars": {
+    "color_mode": "gray", "bar_width": 0.58,
+    "face_alpha": 0.5, "edge_alpha": 0.95, "edge_width": 2.0
+  },
+  "axis": {"x_tick_rotation": 45, "zero_baseline": true},
+  "spines": {"top": true, "right": true, "linewidth": 2.5},
+  "value_labels": {"enabled": false},
+  "text": {"title": "Tiny ImageNet-C: images per corruption", "ylabel": "Image count",
+    "title_pad": 6.0, "label_pad": 4.0},
+  "output": {
+    "filename": "../runs/visualizations/tiny_imagenet_c/statistics/corruption_counts.png",
+    "pdf": true, "dpi": 160, "transparent": true
+  }
+}

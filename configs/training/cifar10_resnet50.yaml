@@ -1,0 +1,21 @@
+# Paths are relative to the repository root, not the current directory.
+# batch_size is per GPU; lr is the reference LR for global batch size 128.
+data_dir: data/raw/cifar10/cifar-10-batches-py
+output_dir: runs/cifar10_resnet50_full
+resume: null
+epochs: 200
+batch_size: 256
+lr: 0.1
+momentum: 0.9
+weight_decay: 0.0005
+label_smoothing: 0.1
+seed: 42
+warmup_epochs: 10
+log_every_epochs: 10
+workers: 4
+gpu_ids: [0]
+cpu: false
+amp: true
+smoke: false
+train_batches: null
+test_batches: null
