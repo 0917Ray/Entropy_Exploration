@@ -7,6 +7,30 @@ import csv
 import json
 from pathlib import Path
 
+import numpy as np
+from matplotlib.colors import to_rgba
+
+
+def moving_average(values, window):
+    values = np.asarray(values, dtype=float)
+    if window <= 1 or len(values) <= 2:
+        return values.copy()
+    window = min(int(window), len(values))
+    half = window // 2
+    return np.asarray([
+        np.nanmean(values[max(0, i - half):min(len(values), i + half + 1)])
+        for i in range(len(values))
+    ])
+
+
+def marker_indices(size, count):
+    if isinstance(count, str) and count.upper() == "MAX":
+        return np.arange(size)
+    count = max(1, int(count))
+    if size <= count:
+        return np.arange(size)
+    return np.arange(0, size, int(np.ceil(size / count)))
+
 
 def load_rows(config_path: Path) -> list[dict[str, float]]:
     config = json.loads(config_path.read_text(encoding="utf-8"))
@@ -43,6 +67,14 @@ def render(config_path: Path) -> list[Path]:
     output_dir = config_path.parent.parent / "outputs"
     dpi = config["figure"]["dpi"]
     transparent = config["figure"]["transparent"]
+    plot_config = config.get("plot", {})
+    smooth_enabled = bool(plot_config.get("smooth_enabled", True))
+    show_original = bool(plot_config.get("show_original", True))
+    smooth_window = int(plot_config.get("smooth", plot_config.get("smooth_window", 5)))
+    markers_config = plot_config.get("markers", {})
+    show_markers = bool(markers_config.get("enabled", True))
+    marker_count = markers_config.get("count", 10)
+    spine_width = float(config.get("figure", {}).get("spine_width", 2.5))
     outputs = []
     series = [("train_accuracy", "Training accuracy", train_style),
               ("val_accuracy", "Validation accuracy", val_style)]
@@ -53,14 +85,27 @@ def render(config_path: Path) -> list[Path]:
     ):
         fig, ax = plt.subplots(figsize=config["figure"]["figsize"])
         for key, label, color in selected:
-            ax.plot(x, [row[key] * 100 for row in rows], label=label,
-                    color=color["color"], linewidth=color["linewidth"], alpha=color["line_alpha"],
-                    marker=color["marker"], markersize=color["marker_size"])
+            values = np.asarray([row[key] * 100 for row in rows], dtype=float)
+            displayed = moving_average(values, smooth_window) if smooth_enabled else values
+            if show_original and smooth_enabled and smooth_window > 1:
+                ax.plot(x, values, color=color["color"], linewidth=1.0, alpha=.35,
+                        linestyle=":", zorder=1)
+            style = dict(color=color["color"], linewidth=color["linewidth"],
+                         alpha=color["line_alpha"], zorder=3)
+            if show_markers:
+                style.update(marker=color["marker"], markersize=color["marker_size"],
+                             markevery=marker_indices(len(x), marker_count),
+                             markerfacecolor=to_rgba(color["color"], .6),
+                             markeredgecolor=to_rgba(color["color"], .95),
+                             markeredgewidth=1.35)
+            ax.plot(x, displayed, label=label, **style)
         ax.set_title(title)
         ax.set_xlabel("Epoch")
         ax.set_ylabel("Accuracy (%)")
         ax.set_ylim(0, 100)
         ax.grid(True, linestyle="--", alpha=0.35)
+        for spine in ax.spines.values():
+            spine.set_linewidth(spine_width)
         ax.legend(loc="best")
         fig.tight_layout()
         for extension in ("png", "pdf") if config["output"]["pdf"] else ("png",):

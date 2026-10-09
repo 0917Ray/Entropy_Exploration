@@ -1,6 +1,6 @@
 data: data/raw/tiny_imagenet_c/Tiny-ImageNet-C
 clean: data/raw/tiny_imagenet_c/tiny-imagenet-200
-output: runs/visualizations/tiny_imagenet_c
+output: runs/dataset_visualizations/tiny_imagenet_c
 report_path: null  # null writes output/report.md
 groups:
   noise: [gaussian_noise, shot_noise, impulse_noise]

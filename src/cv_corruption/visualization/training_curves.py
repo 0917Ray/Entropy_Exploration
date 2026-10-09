@@ -16,6 +16,7 @@ import shutil
 from pathlib import Path
 
 import yaml
+import numpy as np
 
 
 SKILL_SCRIPT = Path(
@@ -94,6 +95,11 @@ def metrics_to_rows(metrics_path: Path) -> list[dict[str, float | int]]:
                     "val_accuracy": float(record["test"]["accuracy"]),
                     "learning_rate": float(record["lr"]),
                 }
+                for metric, source in (("train_loss", "train"), ("val_loss", "test"),
+                                       ("train_accuracy", "train"), ("val_accuracy", "test")):
+                    std_key = f"{metric}_std"
+                    if std_key in record[source]:
+                        row[std_key] = float(record[source][std_key])
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
                 raise ValueError(f"Invalid metrics record at {metrics_path}:{line_number}") from exc
             rows.append(row)
@@ -102,8 +108,10 @@ def metrics_to_rows(metrics_path: Path) -> list[dict[str, float | int]]:
     return rows
 
 
-def write_bundle(run_dir: Path, *, smooth: int | None = None, render: bool = True,
-                 template: Path | None = None) -> Path:
+def write_bundle(run_dir: Path, *, smooth: int | None = None, smooth_enabled: bool | None = None,
+                 show_original: bool | None = None,
+                 markers_enabled: bool | None = None, marker_count: str | int | None = None,
+                 render: bool = True, template: Path | None = None) -> Path:
     """Create CSV/config/plot script and optionally render the standard figures."""
     run_dir = Path(run_dir)
     paths = _paths(run_dir)
@@ -129,7 +137,15 @@ def write_bundle(run_dir: Path, *, smooth: int | None = None, render: bool = Tru
             "val_loss_key": "val_loss",
             "lr_key": "learning_rate",
         },
-        "plot": {"smooth": int(smooth) if smooth is not None else config.get("plot", {}).get("smooth", 1)},
+        "plot": {"smooth": int(smooth) if smooth is not None else config.get("plot", {}).get("smooth", 5),
+                 "smooth_enabled": (smooth_enabled if smooth_enabled is not None else
+                                     config.get("plot", {}).get("smooth_enabled", True)),
+                 "show_original": (show_original if show_original is not None else
+                                    config.get("plot", {}).get("show_original", True)),
+                 "markers": {"enabled": (markers_enabled if markers_enabled is not None else
+                                             config.get("plot", {}).get("markers", {}).get("enabled", True)),
+                             "count": (marker_count if marker_count is not None else
+                                        config.get("plot", {}).get("markers", {}).get("count", 10))}},
         "series": {
             "train_accuracy": {"color": "#5E887E", "linewidth": 2.0,
                                 "line_alpha": 0.92, "marker": "o", "marker_size": 4.5},
@@ -157,6 +173,40 @@ def render_accuracy_bundle(run_dir: Path, config_path: Path | None = None) -> No
              "--config", str(config_path)],
             cwd=Path(run_dir), check=True, stdout=log, stderr=log,
         )
+
+
+def render_seed_std_bundle(run_dir: Path) -> None:
+    """Render mean +/- seed standard deviation bands when aggregate columns exist."""
+    import matplotlib.pyplot as plt
+    rows = metrics_to_rows(Path(run_dir) / "metrics.jsonl")
+    metrics = (("train_loss", "Training loss"), ("val_loss", "Validation loss"),
+               ("train_accuracy", "Training accuracy"), ("val_accuracy", "Validation accuracy"))
+    if not any(f"{key}_std" in rows[0] for key, _ in metrics):
+        return
+    output = Path(run_dir) / "outputs"
+    for key, title in metrics:
+        std_key = f"{key}_std"
+        if std_key not in rows[0]:
+            continue
+        x = np.asarray([row["epoch"] for row in rows])
+        mean = np.asarray([row[key] for row in rows])
+        spread = np.asarray([row[std_key] for row in rows])
+        fig, ax = plt.subplots(figsize=(7.4, 5.0))
+        ax.plot(x, mean, color="#5B7CA7", linewidth=2.2, label="Mean")
+        ax.fill_between(x, mean - spread, mean + spread, color="#5B7CA7", alpha=.2,
+                        linewidth=0, label="± 1 std")
+        ax.set(xlabel="Epoch", ylabel="Accuracy" if "accuracy" in key else "Loss",
+               title=f"{title} (mean ± std across seeds)")
+        if "accuracy" in key:
+            ax.set_ylim(0, 1)
+        ax.grid(True, linestyle="--", alpha=.3)
+        ax.legend()
+        fig.tight_layout()
+        for extension in ("png", "pdf"):
+            path = output / extension / "training_curves" / f"{key}_mean_std.{extension}"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(path, dpi=300, transparent=True, bbox_inches="tight")
+        plt.close(fig)
 
 
 def render_bundle(run_dir: Path, config_path: Path | None = None) -> None:

@@ -20,8 +20,8 @@ from cv_corruption.visualization.galleries import (
 
 CV_ROOT = PROJECT_ROOT / "CV_Corruption"
 DATA = CV_ROOT / "data/raw/cifar10/cifar-10-batches-py"
-OUTPUT = CV_ROOT / "runs/visualizations/cifar10/cifar10_label_examples_two_rows.pdf"
-OUTPUT_ROW = CV_ROOT / "runs/visualizations/cifar10/cifar10_label_examples_single_row.pdf"
+OUTPUT = CV_ROOT / "runs/dataset_visualizations/cifar10/cifar10_label_examples_two_rows.pdf"
+OUTPUT_ROW = CV_ROOT / "runs/dataset_visualizations/cifar10/cifar10_label_examples_single_row.pdf"
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", "--data-dir", type=Path, default=DATA)

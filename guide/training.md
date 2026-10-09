@@ -1,9 +1,10 @@
-# 从头训练 CIFAR-10 ResNet-50
+# CIFAR-10 ResNet-50 训练指南
 
-配置文件：`configs/training/cifar10_resnet50.yaml`。
+本项目使用 CIFAR-sized ResNet-50 在 CIFAR-10 上从头训练。训练过程始终记录 loss、accuracy、
+entropy、normalized entropy、confidence、ECE 和 class-wise 指标。`--entropy-experiment`
+只控制训练结束时是否自动生成 entropy 图片，不控制指标记录。
 
-训练使用随机初始化的 CIFAR-sized ResNet-50，不加载 ImageNet 权重。每次新训练都会创建带本地时间戳的独立目录，例如
-`runs/cifar10_resnet50_20261002-153000`。只有 `--resume` 会复用原目录。
+所有新训练都会创建带时间戳的独立目录。建议每个实验使用不同的 `--output-dir`。
 
 ## 环境检查
 
@@ -15,6 +16,9 @@ print(torch.__version__, torch.cuda.is_available(), torch.cuda.device_count())
 PY
 ```
 
+配置文件是 `configs/training/cifar10_resnet50.yaml`。其中 `gpu_ids` 表示使用的物理 GPU，
+`batch_size` 表示每张 GPU 的 batch size。
+
 ## CPU Smoke Test
 
 ```bash
@@ -22,116 +26,234 @@ cv-train \
   --config configs/training/cifar10_resnet50.yaml \
   --cpu --smoke --batch-size 2 \
   --train-batches 1 --test-batches 1 --workers 0 \
-  --output-dir runs/cifar10_resnet50_cpu_smoke
+  --output-dir runs/cifar10_cpu_smoke
 ```
 
-命令会实际创建类似 `cifar10_resnet50_cpu_smoke_YYYYMMDD-HHMMSS` 的目录。
-
 ## 单卡训练
+
+### 不自动生成 entropy 图片
+
+指标仍会完整记录，但训练结束时只自动生成普通训练曲线：
 
 ```bash
 cv-train \
   --config configs/training/cifar10_resnet50.yaml \
-  --gpu-ids 0 --epochs 200 \
-  --output-dir runs/cifar10_resnet50
+  --gpu-ids 0 \
+  --no-entropy-experiment \
+  --epochs 200 \
+  --output-dir runs/cifar10_single_gpu_no_entropy
 ```
 
-## 多卡 DDP
+### 自动生成 entropy 图片
+
+```bash
+cv-train \
+  --config configs/training/cifar10_resnet50.yaml \
+  --gpu-ids 0 \
+  --entropy-experiment \
+  --epochs 200 \
+  --output-dir runs/cifar10_single_gpu_entropy
+```
+
+## 四卡训练
+
+四卡 DDP 必须使用 `torchrun`。`--nproc_per_node`、`--gpu-ids` 和 YAML 中的 GPU 数量必须一致。
+例如配置文件中使用：
+
+```yaml
+gpu_ids: [0, 1, 2, 3]
+```
+
+### 不自动生成 entropy 图片
 
 ```bash
 OMP_NUM_THREADS=1 torchrun --standalone --nproc_per_node=4 \
   -m cv_corruption.cli.train \
   --config configs/training/cifar10_resnet50.yaml \
-  --gpu-ids 0 1 2 3 --epochs 500 \
-  --output-dir runs/cifar10_resnet50_4gpu_500epochs
+  --gpu-ids 0 1 2 3 \
+  --no-entropy-experiment \
+  --epochs 200 \
+  --output-dir runs/cifar10_4gpu_no_entropy
 ```
 
-Entropy 实验的四卡完整教程（包括 GPU 检查、四卡 smoke test、seed 批量运行和断点恢复）见
-[Experiment 1：Entropy 监测](entropy_experiment.md#四张-gpu-运行)。
-
-## 恢复训练
+### 自动生成 entropy 图片
 
 ```bash
-cv-train \
-  --resume runs/cifar10_resnet50_YYYYMMDD-HHMMSS/checkpoints/last.pt \
-  --gpu-ids 0 --epochs 220
+OMP_NUM_THREADS=1 torchrun --standalone --nproc_per_node=4 \
+  -m cv_corruption.cli.train \
+  --config configs/training/cifar10_resnet50.yaml \
+  --gpu-ids 0 1 2 3 \
+  --entropy-experiment \
+  --epochs 200 \
+  --output-dir runs/cifar10_4gpu_entropy
 ```
 
-恢复时 GPU 数量、关键优化器参数和 AMP 设置必须与 checkpoint 一致；可以增加
-`epochs`，但不能把完整训练切换成 smoke。训练结果包含 `resolved_config.json`、
-`config.json`、`metrics.jsonl`、日志、`checkpoints/` 和曲线 bundle。
+不要在 `torchrun` 命令中加入 `--seeds`。`--seeds` 是下面介绍的外层多 seed 编排模式。
 
-## 训练曲线
+## 多 seed 训练
 
-项目级绘图模板位于 `configs/visualization/training_curves.yaml`。训练结束时，程序读取该
-YAML，并将本次运行实际使用的配置保存为 run 目录内的
-`configs/training_curves.json`；修改 YAML 不会改变已经完成的 run。
+一次运行多个 seed 时，外层使用普通 `cv-train`。程序会为每个 seed 创建独立子 run，训练完成后
+在父 run 中生成 mean ± standard deviation across seeds 曲线。
 
-### 配置绘图样式
-
-编辑以下文件可以控制后续 run 的默认绘图结果：
-
-```text
-CV_Corruption/configs/visualization/training_curves.yaml
-```
-
-常用字段示例：
-
-```yaml
-plot:
-  mode: all-separate
-  smooth: 5
-figure:
-  dpi: 300
-  transparent: true
-axis:
-  xlabel: Epoch
-  grid: true
-output:
-  filename: curves.png
-  pdf: true
-```
-
-其中 `smooth` 是训练 loss 的显示平滑窗口；原始值仍完整保存在
-`data/training_curves.csv`，不会被修改。YAML 只作为新生成 run 的模板，不会覆盖已经
-完成实验的结果。
-
-训练正常结束后会自动生成：
-
-- `data/training_curves.csv`：完整精度的 epoch、train/validation loss 和 learning rate；
-- `configs/training_curves.json`：可编辑的绘图配置；
-- `scripts/accuracy_curves.py`：accuracy 曲线的独立重绘脚本；
-- `outputs/png/`、`outputs/pdf/`：曲线图片，文件名只保留曲线主体；
-- `logs/training_curves.log`：绘图日志；
-- 四张 loss/LR PNG 和对应 PDF（训练损失、验证损失、两者比较、学习率）；
-- 三张 accuracy PNG 和对应 PDF（训练准确率、验证准确率、两者比较）；
-- `scripts/accuracy_curves.py`：accuracy 曲线的独立重绘脚本。
-
-也可以在已有 run 上单独重绘：
-
-```bash
-cv-plot-training --run-dir CV_Corruption/runs/cifar10_resnet50_4gpu_300_epochs_20261002-204823 --smooth 1
-```
-
-对于已经完成的 run，修改其目录内的 `configs/training_curves.json` 后，执行
-`cv-plot-training --run-dir <run-dir>` 即可离线重绘，
-不需要重新训练。绘图使用 `plot-training-curves` skill 的标准配置和可视化样式；accuracy
-曲线由 `scripts/accuracy_curves.py` 生成。
-
-训练终端只显示 rank 0 的结构化日志，例如 `[INFO]`、`[WARNING]` 和
-`[SUCCESS]`。绘图脚本的详细输出（包括 Matplotlib warning）保存在
-`logs/training_curves.log`；完整训练日志保存在 `train.log`。设置
-`OMP_NUM_THREADS=1` 可避免 `torchrun` 自身打印线程数提示。
-
-配置文件中的 `log_every_epochs` 控制详细 epoch 日志打印频率，默认每 5 个 epoch 打印一次；
-rank 0 同时显示 tqdm 进度条，其中包含完成比例、速度和预计剩余时间。训练默认使用 5 个
-epoch 的 learning-rate warmup，以降低多卡大 batch 从头训练时出现 NaN 的风险。
-
-## 常用覆盖
+### 单卡多 seed，无 entropy 图片
 
 ```bash
 cv-train \
   --config configs/training/cifar10_resnet50.yaml \
-  --epochs 20 --batch-size 256 --set seed=7 \
-  --output-dir runs/cifar10_seed7
+  --gpu-ids 0 \
+  --seeds 0 1 2 \
+  --no-entropy-experiment \
+  --epochs 200 \
+  --output-dir runs/cifar10_multiseed_single_gpu
 ```
+
+### 单卡多 seed，自动生成 entropy 图片
+
+```bash
+cv-train \
+  --config configs/training/cifar10_resnet50.yaml \
+  --gpu-ids 0 \
+  --seeds 0 1 2 \
+  --entropy-experiment \
+  --epochs 200 \
+  --output-dir runs/cifar10_multiseed_single_gpu_entropy
+```
+
+### 四卡多 seed，无 entropy 图片
+
+外层仍然使用普通 `cv-train`；程序会自动为每个 seed 启动一个四卡 `torchrun` 子任务：
+
+```bash
+cv-train \
+  --config configs/training/cifar10_resnet50.yaml \
+  --gpu-ids 1 3 \
+  --seeds 42 43 44 45 46 123 \
+  --no-entropy-experiment \
+  --epochs 200 \
+  --output-dir runs/cifar10_multiseed_4gpu
+```
+
+### 四卡多 seed，自动生成 entropy 图片
+
+```bash
+cv-train \
+  --config configs/training/cifar10_resnet50.yaml \
+  --gpu-ids 1 3 \
+  --seeds 42 43 44 45 46 123 \
+  --entropy-experiment \
+  --epochs 300 \
+  --output-dir runs/cifar10_multiseed_4gpu_entropy_500_epochs
+```
+
+多 seed 父目录结构类似：
+
+```text
+cifar10_multiseed_4gpu_entropy_<timestamp>/
+├── seed_0_<timestamp>/
+├── seed_1_<timestamp>/
+├── seed_2_<timestamp>/
+├── metrics.jsonl                 # mean 和 *_std
+├── metrics/epoch_metrics.jsonl   # entropy 等指标的 mean 和 *_std
+├── outputs/                      # 父 run 的 mean ± std 图
+└── seeds.json
+```
+
+子 run 可以独立分析；父 run 的实线是 seed 均值，阴影是均值上下一个标准差。
+
+## 输出指标
+
+每个 run 都会写入：
+
+```text
+metrics.jsonl
+metrics/epoch_metrics.jsonl
+metrics/batch_metrics.jsonl
+config.json
+resolved_config.json
+checkpoints/last.pt
+checkpoints/best.pt
+```
+
+即使关闭 entropy 图片，`epoch_metrics.jsonl` 和 `batch_metrics.jsonl` 仍然存在。
+
+## 训练完成后重绘
+
+修改绘图配置后，不需要重新训练。普通训练曲线：
+
+```bash
+cv-plot-training --run-dir runs/<run-directory>
+```
+
+训练曲线默认使用窗口为 5 的 moving average，并绘制每条曲线最多 10 个 marker。重绘时
+可以临时覆盖这些选项：
+
+```bash
+cv-plot-training --run-dir runs/<run-directory> \
+  --no-smooth --no-markers
+cv-plot-training --run-dir runs/<run-directory> \
+  --smooth-window 15 --markers 20
+cv-plot-training --run-dir runs/<run-directory> --no-original
+```
+
+marker 数量支持 `5`、`10`、`15`、`20` 和 `MAX`；`MAX` 表示所有记录点。长期使用的设置
+请修改 `configs/visualization/training_curves.yaml` 中的 `plot.smooth_enabled`、
+`plot.smooth`、`plot.markers.enabled` 和 `plot.markers.count`。
+原始曲线显示由 `plot.show_original` 控制，也可以使用 `--no-original` 临时关闭。
+
+Entropy 曲线：
+
+```bash
+cv-plot-entropy \
+  --run-dir runs/<run-directory> \
+  --config configs/visualization/entropy_curves.yaml
+```
+
+Entropy 曲线默认同样使用窗口为 5 的 moving average、原始曲线参考线和最多 10 个 marker。
+可用 `--smooth-window`、`--no-smooth`、`--no-original`、`--no-markers` 以及
+`--markers 5|10|15|20|MAX` 覆盖默认设置；长期配置请修改
+`configs/visualization/entropy_curves.yaml` 中的 `plot` 和 `figure` 字段。
+每个 epoch metric 和 relationships 图都会同时输出 train/test 合并图、单独 train 图和单独
+test 图；合并图使用原文件名，单独图使用 `_train` 和 `_test` 后缀。例如
+`epoch_entropy.png`、`epoch_entropy_train.png`、`epoch_entropy_test.png`。
+
+如果 run 中存在 `metrics/batch_metrics.jsonl`，还会生成 `outputs/*/entropy/batch/` 下的
+batch 图。`Before` 表示一次 optimizer 更新前模型对该 batch 的指标，`After` 表示更新后
+模型再次处理同一个 batch 的指标；`batch_transfer_*` 绘制 `After - Before`。
+
+class-wise 图位于 `outputs/*/entropy/classwise/`，reliability 图位于
+`outputs/*/entropy/reliability/`。这些图同样遵循 `entropy_curves.yaml` 中的 figsize、grid、
+smooth、marker 和 series 设置。
+
+多 seed 父 run 的绘图命令和单 seed 相同；父 run 会继续绘制 mean ± std 阴影带。训练曲线的
+样式配置为 `configs/visualization/training_curves.yaml`，entropy 图的样式配置为
+`configs/visualization/entropy_curves.yaml`。
+
+## 恢复训练
+
+单卡恢复：
+
+```bash
+cv-train \
+  --resume runs/cifar10_single_gpu_entropy_<timestamp>/checkpoints/last.pt \
+  --gpu-ids 0 \
+  --epochs 220
+```
+
+四卡恢复：
+
+```bash
+OMP_NUM_THREADS=1 torchrun --standalone --nproc_per_node=4 \
+  -m cv_corruption.cli.train \
+  --resume runs/cifar10_4gpu_entropy_<timestamp>/checkpoints/last.pt \
+  --gpu-ids 0 1 2 3 \
+  --epochs 220
+```
+
+恢复时必须保持 GPU 数量、关键优化器参数和 AMP 设置一致。多 seed 父 run 不使用 `--resume`；
+如需恢复某个 seed，请对相应的 `seed_<id>_<timestamp>` 子 run 单独恢复。
+
+## 指标定义
+
+Entropy 为 `-sum(p * log(p))`，normalized entropy 为 entropy 除以 `log(10)`；confidence 是
+最大 softmax 概率；ECE 默认使用 10 个等宽 confidence bins。数据集指标按样本数加权，class-wise
+指标按类别聚合。

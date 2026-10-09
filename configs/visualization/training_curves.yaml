@@ -2,7 +2,12 @@
 # A run receives a resolved JSON copy in its own output directory.
 plot:
   mode: all-separate
-  smooth: 1
+  smooth: 5
+  smooth_enabled: true
+  show_original: true
+  markers:
+    enabled: true
+    count: 10
   title: null
 figure:
   figsize: [12, 4.5]

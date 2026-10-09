@@ -1,6 +1,6 @@
 data: data/raw/cifar10_c/CIFAR-10-C
 clean: data/raw/cifar10/cifar-10-batches-py/test_batch
-output: runs/visualizations/cifar10_c
+output: runs/dataset_visualizations/cifar10_c
 # All 19 available types for visualization; evaluation uses the standard 15.
 groups:
   noise: [gaussian_noise, shot_noise, impulse_noise, speckle_noise]

@@ -31,7 +31,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from cv_corruption.data.cifar10 import CIFAR10Pickles, class_names
 from cv_corruption.models.resnet import MEAN, STD, make_model
 from cv_corruption.config.loader import parse_config, save_config
-from cv_corruption.visualization.training_curves import write_bundle
+from cv_corruption.visualization.training_curves import write_bundle, render_seed_std_bundle
 from cv_corruption.visualization.entropy_curves import render_entropy_bundle
 from cv_corruption.evaluation.metrics import batch_metrics, weighted_average
 
@@ -195,6 +195,8 @@ def parse_args(argv=None):
     parser.add_argument("--weight-decay", type=float)
     parser.add_argument("--label-smoothing", type=float)
     parser.add_argument("--seed", type=int)
+    parser.add_argument("--seeds", type=int, nargs="+",
+                        help="Run independent trainings for each seed and create an averaged parent run")
     parser.add_argument("--warmup-epochs", type=int)
     parser.add_argument("--log-every-epochs", type=int)
     parser.add_argument("--workers", type=int)
@@ -202,6 +204,8 @@ def parse_args(argv=None):
     parser.add_argument("--cpu", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--amp", action=argparse.BooleanOptionalAction, default=None,
                         help="Enable/disable automatic mixed precision")
+    parser.add_argument("--entropy-experiment", action=argparse.BooleanOptionalAction, default=False,
+                        help="Render entropy figures automatically when training finishes; metrics are always recorded")
     parser.add_argument("--smoke", action=argparse.BooleanOptionalAction, default=False,
                         help="One epoch, two train and two test batches by default")
     parser.add_argument("--train-batches", type=int)
@@ -213,9 +217,88 @@ def parse_args(argv=None):
     return args
 
 
+def _aggregate_value(values):
+    if values and all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in values):
+        mean = sum(values) / len(values)
+        variance = sum((value - mean) ** 2 for value in values) / len(values)
+        return mean, variance ** 0.5
+    if values and all(isinstance(value, dict) for value in values):
+        result = {}
+        for key in set().union(*(value for value in values)):
+            if key in {"epoch", "batch"}:
+                result[key] = int(values[0][key])
+                continue
+            mean, std = _aggregate_value([value[key] for value in values if key in value])
+            result[key] = mean
+            if std is not None:
+                result[f"{key}_std"] = std
+        return result, None
+    return (values[0] if values else None), None
+
+
+def _average_jsonl(run_dirs, relative_path, output_path):
+    records_by_run = []
+    for run_dir in run_dirs:
+        with (run_dir / relative_path).open(encoding="utf-8") as stream:
+            records_by_run.append([json.loads(line) for line in stream if line.strip()])
+    common_epochs = sorted(set.intersection(*(set(row["epoch"] for row in rows) for rows in records_by_run)))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as stream:
+        for epoch in common_epochs:
+            records = [[row for row in rows if row["epoch"] == epoch][0] for rows in records_by_run]
+            stream.write(json.dumps(_aggregate_value(records)[0], ensure_ascii=False) + "\n")
+
+
+def run_multi_seed(args):
+    if args.resume:
+        raise ValueError("--seeds cannot be combined with --resume")
+    if not args.seeds or len(set(args.seeds)) != len(args.seeds):
+        raise ValueError("--seeds must contain distinct seed values")
+    if int(os.environ.get("WORLD_SIZE", "1")) != 1:
+        raise ValueError("Multi-seed orchestration must be launched without torchrun")
+    base = args.output_dir or RUNS_DIR / "cifar10_resnet50_multiseed"
+    parent = timestamped_run_dir(base)
+    parent.mkdir(parents=True, exist_ok=True)
+    children = []
+    original = list(sys.argv[1:])
+    command_base = [item for item in original if item != "--seeds"]
+    # Remove the values following --seeds; the internal guard prevents recursion,
+    # while duplicate --seed/--output-dir flags intentionally use the last value.
+    if "--seeds" in original:
+        index = original.index("--seeds")
+        command_base = original[:index] + original[index + 1:]
+        while index < len(command_base) and not command_base[index].startswith("--"):
+            command_base.pop(index)
+    environment = dict(os.environ, CV_MULTI_SEED_CHILD="1")
+    for seed in args.seeds:
+        child_base = parent / f"seed_{seed}"
+        child_args = [*command_base, "--seed", str(seed), "--output-dir", str(child_base)]
+        if len(args.gpu_ids) > 1:
+            command = ["torchrun", "--standalone", f"--nproc_per_node={len(args.gpu_ids)}",
+                       "-m", "cv_corruption.cli.train", *child_args]
+        else:
+            command = [sys.executable, "-m", "cv_corruption.cli.train", *child_args]
+        subprocess.run(command, check=True, env=environment)
+        matches = sorted(parent.glob(f"seed_{seed}_*"))
+        if not matches:
+            raise FileNotFoundError(f"Child run for seed {seed} was not created")
+        children.append(matches[-1])
+    _average_jsonl(children, Path("metrics.jsonl"), parent / "metrics.jsonl")
+    _average_jsonl(children, Path("metrics/epoch_metrics.jsonl"), parent / "metrics/epoch_metrics.jsonl")
+    with (parent / "seeds.json").open("w", encoding="utf-8") as stream:
+        json.dump({"seeds": args.seeds, "runs": [str(path) for path in children]}, stream, indent=2)
+    write_bundle(parent, render=True)
+    render_seed_std_bundle(parent)
+    render_entropy_bundle(parent, PROJECT_ROOT / "CV_Corruption/configs/visualization/entropy_curves.yaml")
+    logging.info("Completed multi-seed run: %s", parent)
+
+
 def main():
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
     args = parse_args()
+    if args.seeds and os.environ.get("CV_MULTI_SEED_CHILD") != "1":
+        run_multi_seed(args)
+        return
     rank = int(os.environ.get("RANK", "0"))
     world_size = int(os.environ.get("WORLD_SIZE", "1"))
     local_rank = int(os.environ.get("LOCAL_RANK", "0"))
@@ -255,6 +338,8 @@ def main():
             if checkpoint and requested is not None and requested != previous:
                 raise ValueError(f"--{name.replace('_', '-')} differs from checkpoint ({previous})")
             setattr(args, name, previous if requested is None else requested)
+        if checkpoint and "entropy_experiment" in old_config and "entropy_experiment" not in args._provided:
+            args.entropy_experiment = old_config["entropy_experiment"]
         if checkpoint and old_config["world_size"] != world_size:
             raise ValueError("Resume requires the original GPU count to preserve optimizer and RNG state")
         if checkpoint and args.smoke != old_config["smoke"]:
@@ -392,6 +477,7 @@ def main():
             "gpu_ids": args.gpu_ids if not args.cpu else [], "rank_to_physical_gpu": args.gpu_ids if not args.cpu else [],
             "rank_seeds": [args.seed + r for r in range(world_size)], "world_size": world_size,
             "amp": scaler.is_enabled(), "smoke": args.smoke,
+            "entropy_experiment": args.entropy_experiment,
             "cpu": args.cpu, "resume": str(args.resume) if args.resume else None,
             "source_config": str(args.config) if args.config else None,
             "train_batches": args.train_batches, "test_batches": args.test_batches,
@@ -413,6 +499,7 @@ def main():
                          device, config["gpu_ids"] or "cpu", world_size, args.seed)
             logging.info("DATA    train=%d | test=%d | start-epoch=%d | run=%s",
                          len(train_data), len(test_data), start_epoch, output_dir)
+            logging.info("MONITOR entropy_metrics=always | entropy_figures=%s", args.entropy_experiment)
             progress = tqdm(
                 total=args.epochs - start_epoch + 1, desc="TRAIN", unit="epoch",
                 dynamic_ncols=True, leave=True,
@@ -511,7 +598,8 @@ def main():
                 progress.close()
             try:
                 write_bundle(output_dir, render=True)
-                render_entropy_bundle(output_dir, PROJECT_ROOT / "CV_Corruption/configs/visualization/entropy_curves.yaml")
+                if args.entropy_experiment:
+                    render_entropy_bundle(output_dir, PROJECT_ROOT / "CV_Corruption/configs/visualization/entropy_curves.yaml")
                 logging.getLogger(__name__).success("DONE    training complete | curves=%s", output_dir)
             except (FileNotFoundError, OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
                 logging.getLogger(__name__).warning("Training completed, but curve rendering failed: %s", exc)

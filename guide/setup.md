@@ -48,7 +48,7 @@ YAML 中的相对路径相对于 `CV_Corruption/` 根目录解析：
 
 ```yaml
 data: data/raw/cifar10_c/CIFAR-10-C
-output: runs/visualizations/cifar10_c
+output: runs/dataset_visualizations/cifar10_c
 ```
 
 因此从仓库上级目录和 `CV_Corruption/` 目录启动都有效。绝对路径也支持。

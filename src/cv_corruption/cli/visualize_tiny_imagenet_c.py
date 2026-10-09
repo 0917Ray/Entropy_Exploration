@@ -319,7 +319,7 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, default=CV_ROOT / "data/raw/tiny_imagenet_c/Tiny-ImageNet-C")
     parser.add_argument("--clean", type=Path, default=CV_ROOT / "data/raw/tiny_imagenet_c/tiny-imagenet-200")
-    parser.add_argument("--output", type=Path, default=CV_ROOT / "runs/visualizations/tiny_imagenet_c")
+    parser.add_argument("--output", type=Path, default=CV_ROOT / "runs/dataset_visualizations/tiny_imagenet_c")
     parser.add_argument("--report-path", type=Path)
     parser.add_argument("--severities", type=int, nargs="+", default=[1, 2, 3, 4, 5])
     parser.add_argument("--selected-label", default="n01443537")

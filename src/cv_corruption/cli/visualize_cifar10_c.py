@@ -23,7 +23,7 @@ from cv_corruption.visualization.galleries import (
 CV_ROOT = PROJECT_ROOT / "CV_Corruption"
 DATA = CV_ROOT / "data/raw/cifar10_c/CIFAR-10-C"
 CLEAN = CV_ROOT / "data/raw/cifar10/cifar-10-batches-py/test_batch"
-OUT = CV_ROOT / "runs/visualizations/cifar10_c"
+OUT = CV_ROOT / "runs/dataset_visualizations/cifar10_c"
 GROUPS = {
     "noise": ["gaussian_noise", "shot_noise", "impulse_noise", "speckle_noise"],
     "blur": ["defocus_blur", "glass_blur", "motion_blur", "zoom_blur", "gaussian_blur"],

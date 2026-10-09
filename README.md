@@ -17,8 +17,8 @@ evaluation, visualization, and their outputs.
 从 [guide](guide/README.md) 开始运行 smoke test、完整训练、DDP、恢复训练、
 CIFAR-10-C 评测和数据可视化。详细数据报告保留在 `docs/CV_Corruption/`。
 
-预训练阶段的 entropy 实验说明、指标定义、运行命令和输出字段见
-[`guide/entropy_experiment.md`](guide/entropy_experiment.md)。
+预训练、监控指标、entropy 图表开关和离线重绘统一见
+[`guide/training.md`](guide/training.md)。
 
 ```text
 src/cv_corruption/           唯一源码包

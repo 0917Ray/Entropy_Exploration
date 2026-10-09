@@ -1,6 +1,6 @@
 data: data/raw/cifar10/cifar-10-batches-py/test_batch
-output: runs/visualizations/cifar10/cifar10_label_examples_two_rows.pdf
-output_row: runs/visualizations/cifar10/cifar10_label_examples_single_row.pdf
+output: runs/dataset_visualizations/cifar10/cifar10_label_examples_two_rows.pdf
+output_row: runs/dataset_visualizations/cifar10/cifar10_label_examples_single_row.pdf
 labels: [airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck]
 # Zero-based position within each class, not the absolute test index.
 sample_index: 0

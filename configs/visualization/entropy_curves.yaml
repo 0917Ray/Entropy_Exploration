@@ -4,3 +4,76 @@ class_groups:
   - [1, 10]
   - [2, 3, 4]
 include_aggregate_classwise: false
+plot:
+  smooth_enabled: true
+  smooth: 5
+  show_original: true
+  markers:
+    enabled: true
+    count: 10
+figure:
+  figsize: [12, 4.5]
+  panel_figsize: [12, 4.5]
+  dpi: 300
+  transparent: true
+  spine_width: 2.5
+axis:
+  xlabel: Epoch
+  x_integer: true
+  grid: true
+  target_x_ticks: 9
+  target_y_ticks: 7
+  y_margin: 0.07
+legend:
+  enabled: true
+  loc: best
+series:
+  train:
+    color: '#5E887E'
+    linewidth: 2.0
+    line_alpha: 0.92
+    marker: o
+    marker_size: 5.0
+    marker_face_alpha: 0.60
+    marker_edge_alpha: 0.95
+    marker_edge_width: 1.35
+  test:
+    color: '#BA6580'
+    linewidth: 2.0
+    line_alpha: 0.92
+    marker: o
+    marker_size: 5.2
+    marker_face_alpha: 0.60
+    marker_edge_alpha: 0.95
+    marker_edge_width: 1.35
+  # Per-figure overrides. Unspecified fields inherit from train/test above.
+  epoch_entropy:
+    train: {linewidth: 2.0, marker_size: 5.0}
+    test: {linewidth: 2.0, marker_size: 5.2}
+  epoch_normalized_entropy:
+    train: {linewidth: 2.0, marker_size: 5.0}
+    test: {linewidth: 2.0, marker_size: 5.2}
+  epoch_confidence:
+    train: {linewidth: 2.0, marker_size: 5.0}
+    test: {linewidth: 2.0, marker_size: 5.2}
+  epoch_accuracy:
+    train: {linewidth: 2.0, marker_size: 5.0}
+    test: {linewidth: 2.0, marker_size: 5.2}
+  epoch_loss:
+    train: {linewidth: 2.0, marker_size: 5.0}
+    test: {linewidth: 2.0, marker_size: 5.2}
+  epoch_ece:
+    train: {linewidth: 2.0, marker_size: 5.0}
+    test: {linewidth: 2.0, marker_size: 5.2}
+  classwise:
+    test: {linewidth: 2.0, marker_size: 5.2}
+  batch_entropy:
+    train: {linewidth: 2.0, marker_size: 5.0}
+    test: {linewidth: 2.0, marker_size: 5.2}
+  batch_loss:
+    train: {linewidth: 2.0, marker_size: 5.0}
+    test: {linewidth: 2.0, marker_size: 5.2}
+  batch_transfer_entropy:
+    train: {linewidth: 2.0, marker_size: 5.0}
+  batch_transfer_loss:
+    test: {linewidth: 2.0, marker_size: 5.2}

@@ -12,7 +12,7 @@ from cv_corruption.cli import visualize_cifar10_c as show_cifar10_c
 from cv_corruption.cli import visualize_examples as show_cifar10_examples
 from cv_corruption.cli import visualize_tiny_imagenet_c as show_tiny_imagenet_c
 from cv_corruption.config.loader import CV_ROOT, resolved_config, save_config
-from cv_corruption.cli.train import timestamped_run_dir
+from cv_corruption.cli.train import _aggregate_value, timestamped_run_dir
 from cv_corruption.visualization.training_curves import metrics_to_rows, write_bundle
 
 
@@ -21,6 +21,26 @@ class EntryConfigTests(unittest.TestCase):
         args = train.parse_args(["--config", str(CV_ROOT / "configs/training/cifar10_resnet50.yaml"),
                                  "--epochs", "20", "--batch-size", "256", "--gpu-ids", "1", "--no-amp"])
         self.assertEqual((args.epochs, args.batch_size, args.gpu_ids, args.amp), (20, 256, [1], False))
+
+    def test_entropy_experiment_is_rendering_switch(self):
+        args = train.parse_args(["--no-entropy-experiment"])
+        self.assertFalse(args.entropy_experiment)
+        args = train.parse_args(["--entropy-experiment"])
+        self.assertTrue(args.entropy_experiment)
+
+    def test_multi_seed_arguments(self):
+        args = train.parse_args(["--seeds", "0", "1", "2"])
+        self.assertEqual(args.seeds, [0, 1, 2])
+
+    def test_multi_seed_aggregate_preserves_epoch_integer(self):
+        aggregate, _ = _aggregate_value([
+            {"epoch": 10, "train": {"loss": 1.0}},
+            {"epoch": 10, "train": {"loss": 3.0}},
+        ])
+        self.assertEqual(aggregate["epoch"], 10)
+        self.assertIsInstance(aggregate["epoch"], int)
+        self.assertEqual(aggregate["train"]["loss"], 2.0)
+        self.assertAlmostEqual(aggregate["train"]["loss_std"], 1.0)
 
     def test_legacy_resume_leaves_recipe_unset(self):
         args = train.parse_args(["--resume", "CV_Corruption/runs/test/checkpoints/last.pt", "--cpu"])

@@ -1,6 +1,6 @@
 {
   "data": {
-    "input": "../runs/visualizations/tiny_imagenet_c/statistics/corruption_totals.csv",
+    "input": "../runs/dataset_visualizations/tiny_imagenet_c/statistics/corruption_totals.csv",
     "source": "Tiny ImageNet-C condition_counts.csv aggregated over configured severities",
     "mode": "single",
     "label_column": "corruption",
@@ -18,7 +18,7 @@
   "text": {"title": "Tiny ImageNet-C: images per corruption", "ylabel": "Image count",
     "title_pad": 6.0, "label_pad": 4.0},
   "output": {
-    "filename": "../runs/visualizations/tiny_imagenet_c/statistics/corruption_counts.png",
+    "filename": "../runs/dataset_visualizations/tiny_imagenet_c/statistics/corruption_counts.png",
     "pdf": true, "dpi": 160, "transparent": true
   }
 }
